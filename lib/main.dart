@@ -55,8 +55,14 @@ Future<void> clearCache() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await clearCache();
-  setupLocalNotification();
+  
+  try {
+    setupLocalNotification();
+  } catch (e) {
+    print('Error setting up local notifications: $e');
+  }
 
+  // Firebase initialization
   try {
     if (Platform.isIOS) {
       await Firebase.initializeApp(
@@ -79,10 +85,10 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     setupFirebaseMessaging();
-    setupOrderFirebaseMessaging();
   } catch (e) {
     print('Failed to initialize Firebase: $e');
   }
+  
 
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])
       .then((_) {
@@ -125,9 +131,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     initUniLinks();
     loadData();
-    requestFirebasePermissions();
-    setupFirebaseMessaging();
-    setupInAppMessaging();
+    // Request Firebase permissions after initialization
+    Future.delayed(Duration(milliseconds: 500), () {
+      try {
+        requestFirebasePermissions();
+      } catch (e) {
+        print('Error during Firebase setup: $e');
+      }
+    });
   }
 
   Future<void> loadData() async {
@@ -149,26 +160,63 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> requestFirebasePermissions() async {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      
+      // Get and print FCM Token for testing (with delay to ensure Firebase is ready)
+      await Future.delayed(Duration(milliseconds: 500));
+      getFCMToken();
+    } catch (e) {
+      print('Error in requestFirebasePermissions: $e');
+    }
+  }
+
+  Future<void> getFCMToken() async {
+    try {
+      String? token = await FirebaseMessaging.instance.getToken().timeout(
+        Duration(seconds: 10),
+        onTimeout: () {
+          print('FCM token request timed out');
+          return null;
+        },
+      );
+      
+      if (token != null) {
+        print('========================================');
+        print('FCM TOKEN: $token');
+        print('========================================');
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('fcm_token', token);
+      } else {
+        print('FCM token is null - Firebase may be unavailable');
+      }
+    } catch (e) {
+      print('Failed to get FCM token: $e');
+      print('App will continue without FCM - users can still use the app');
+    }
   }
 
   void setupFirebaseMessaging() async {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("Foreground message: ${message.notification?.title}");
-    });
+    try {
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print("Foreground message: ${message.notification?.title}");
+      });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("Notification tapped: ${message.data}");
-      if (message.data.containsKey('dynamic_link')) {
-        final dynamicLink = message.data['dynamic_link'];
-        if (dynamicLink is String) handleLink(dynamicLink);
-      }
-    });
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        print("Notification tapped: ${message.data}");
+        if (message.data.containsKey('dynamic_link')) {
+          final dynamicLink = message.data['dynamic_link'];
+          if (dynamicLink is String) handleLink(dynamicLink);
+        }
+      });
+    } catch (e) {
+      print('Error setting up Firebase messaging: $e');
+    }
   }
 
   void initUniLinks() async {
@@ -297,9 +345,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   void setupInAppMessaging() {
-    // Firebase In-App Messaging is automatically enabled after Firebase initialization
-    // In-app messages will be displayed automatically when targeting criteria are met
-    print('Firebase In-App Messaging ready');
+    try {
+      // Firebase In-App Messaging is automatically enabled after Firebase initialization
+      // In-app messages will be displayed automatically when targeting criteria are met
+      print('Firebase In-App Messaging ready');
+    } catch (e) {
+      print('Error setting up In-App Messaging: $e');
+    }
   }
 
   Future<bool> _showExitDialog(BuildContext context) async {

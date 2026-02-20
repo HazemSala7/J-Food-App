@@ -15,46 +15,48 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 void setupLocalNotification() {
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings("logo2");
+  try {
+    // Use the app's launcher icon
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings("@mipmap/launcher_icon");
 
-  const DarwinInitializationSettings initializationSettingsDarwin =
-      DarwinInitializationSettings();
+    const DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings();
 
-  final InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsDarwin,
-  );
+    final InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsDarwin,
+    );
 
-  flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
-  flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'channel_id',
-          'channel_name',
-          description: 'Channel for custom sound notifications',
-          importance: Importance.high,
-          playSound: true,
-          sound: RawResourceAndroidNotificationSound('notification'),
-        ),
-      );
+    flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'channel_id',
+            'channel_name',
+            description: 'Channel for custom sound notifications',
+            importance: Importance.high,
+          ),
+        );
 
-  flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'order_status_channel',
-          'Order Status Updates',
-          description: 'Notifies about order status changes',
-          importance: Importance.high,
-          playSound: true,
-          sound: RawResourceAndroidNotificationSound('notification'),
-        ),
-      );
+    flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'order_status_channel',
+            'Order Status Updates',
+            description: 'Notifies about order status changes',
+            importance: Importance.high,
+          ),
+        );
+    print('Local notifications initialized successfully');
+  } catch (e) {
+    print('Error initializing local notifications: $e');
+  }
 }
 
 Future<void> showBigTextNotification(

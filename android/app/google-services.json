@@ -137,6 +137,25 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:547928555422:android:d4c5e6f7a8b9c0d1e44208f",
+        "android_client_info": {
+          "package_name": "j.food.com.jfood"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWTvbB0gMgADIt6iisVPpgV2V72ESUqSM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
