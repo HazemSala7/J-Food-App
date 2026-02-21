@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:j_food_updated/resources/api-const.dart';
 import 'package:j_food_updated/views/homescreen/homescreen.dart';
-import 'package:j_food_updated/views/resturant_page/restaurant_page.dart';
 import 'package:flutter/material.dart';
 import 'package:j_food_updated/constants/constants.dart';
 import 'package:http/http.dart' as http;

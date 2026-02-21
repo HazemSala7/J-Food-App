@@ -11,7 +11,6 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_in_app_messaging/firebase_in_app_messaging.dart';
 // import 'package:uni_links2/uni_links.dart';
 import 'package:path_provider/path_provider.dart';
 import 'LocalDB/Provider/CartProvider.dart';

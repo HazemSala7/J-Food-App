@@ -95,8 +95,8 @@ class _RestaurantCard extends StatelessWidget {
       closedToday = true;
     } else {
       // Parse today's working hours
-      String openTimeStr = todaySchedule['start_time'];
-      String closeTimeStr = todaySchedule['end_time'];
+      String? openTimeStr = todaySchedule['start_time'];
+      String? closeTimeStr = todaySchedule['end_time'];
 
       if (openTimeStr == null || closeTimeStr == null) {
         return const SizedBox.shrink();

@@ -4,17 +4,15 @@ import 'package:j_food_updated/LocalDB/Provider/CartProvider.dart';
 import 'package:j_food_updated/LocalDB/Provider/PackageCartProvider.dart';
 import 'package:j_food_updated/component/check_box/check_box.dart';
 import 'package:j_food_updated/resources/api-const.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fancy_shimmer_image/fancy_shimmer_image.dart';
 import 'package:flutter/material.dart';
 import 'package:j_food_updated/constants/constants.dart';
-import 'package:j_food_updated/stubs/fluttertoast_stub.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:material_dialogs/dialogs.dart';
 import 'package:material_dialogs/widgets/buttons/icon_button.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:photo_view/photo_view.dart';
 
 // ignore: must_be_immutable
 class ItemWidget extends StatefulWidget {
@@ -1650,7 +1648,13 @@ class _ItemWidgetState extends State<ItemWidget> {
                                           } else {
                                             Fluttertoast.showToast(
                                                 msg:
-                                                    "لا يمكنك الطلب الان ،المحل مغلق");
+                                                    "لا يمكنك الطلب الان ،المحل مغلق",
+                                                toastLength: Toast.LENGTH_LONG,
+                                                gravity: ToastGravity.BOTTOM,
+                                                timeInSecForIosWeb: 3,
+                                                backgroundColor: const Color(0xffE74C3C),
+                                                textColor: Colors.white,
+                                                fontSize: 16.0);
                                           }
                                         }
                                       },
@@ -3334,7 +3338,7 @@ class _ItemWidgetState extends State<ItemWidget> {
         item['component_details'] != null ? "${item['com_price']}" : "0";
     String id = item['component_details'] != null
         ? "${item['component_details']['id'].toString()}"
-        : item['id'].toString() ?? "0";
+        : item['id'].toString();
 
     String? itemImage = item['component_details'] != null
         ? item['component_details']["image"]

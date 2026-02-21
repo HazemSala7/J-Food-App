@@ -1,10 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:j_food_updated/constants/constants.dart';
-import 'package:j_food_updated/notifications/notification_service.dart';
 import 'package:j_food_updated/resources/api-const.dart';
-import 'package:j_food_updated/server/functions/functions.dart';
-import 'package:j_food_updated/views/homescreen/custom_upgrader/custom_upgrader.dart';
 import 'package:j_food_updated/views/homescreen/homescreen.dart';
 import 'package:j_food_updated/views/resturant_page/add_external_order.dart';
 import 'package:j_food_updated/views/resturant_page/add_food.dart';
@@ -17,7 +14,6 @@ import 'package:flutter/material.dart';
 import 'package:j_food_updated/stubs/fluttertoast_stub.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_switch/flutter_switch.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';

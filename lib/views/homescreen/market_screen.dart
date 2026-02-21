@@ -33,15 +33,11 @@ class _MarketScreenState extends State<MarketScreen> {
 
       if (!mounted) return; // ⛔️ Prevent setState after dispose
 
-      if (response != null) {
-        setState(() {
-          _categories = response['categories'];
-          _isLoading = false;
-          _hasError = false;
-        });
-      } else {
-        throw Exception("Failed to load categories");
-      }
+      setState(() {
+        _categories = response['categories'];
+        _isLoading = false;
+        _hasError = false;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() {

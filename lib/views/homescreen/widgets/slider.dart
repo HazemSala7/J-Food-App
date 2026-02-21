@@ -7,7 +7,7 @@ import 'package:j_food_updated/views/storescreen/store_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:fancy_shimmer_image/fancy_shimmer_image.dart';
 import 'package:j_food_updated/stubs/fluttertoast_stub.dart';
-import 'package:carousel_slider/carousel_slider.dart' hide CarouselController;
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 

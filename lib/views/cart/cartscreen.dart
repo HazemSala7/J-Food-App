@@ -693,8 +693,8 @@ class _CartScreenState extends State<CartScreen> {
       }
 
       // Use today's working hours
-      String openTimeStr = todaySchedule['start_time'];
-      String closeTimeStr = todaySchedule['end_time'];
+      String? openTimeStr = todaySchedule['start_time'];
+      String? closeTimeStr = todaySchedule['end_time'];
 
       if (openTimeStr == null || closeTimeStr == null) {
         print('⚠️ WARNING: Invalid times in schedule');

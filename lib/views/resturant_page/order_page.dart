@@ -958,7 +958,7 @@ class _OrderPageState extends State<OrderPage>
                       padding: const EdgeInsets.all(3.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(100),
-                        child: (imageUrl != null && imageUrl.isNotEmpty)
+                        child: imageUrl.isNotEmpty
                             ? FancyShimmerImage(
                                 imageUrl: imageUrl,
                                 width: 70,

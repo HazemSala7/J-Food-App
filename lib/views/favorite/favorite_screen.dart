@@ -7,7 +7,6 @@ import 'dart:convert';
 import '../../LocalDB/Models/FavoriteItem.dart';
 import '../../LocalDB/Provider/FavouriteProvider.dart';
 import '../../constants/constants.dart';
-import '../../server/functions/functions.dart';
 import '../storescreen/store_screen.dart';
 
 class FavoriteScreen extends StatefulWidget {

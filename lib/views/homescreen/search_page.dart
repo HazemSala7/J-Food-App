@@ -10,7 +10,7 @@ import 'package:j_food_updated/views/homescreen/widgets/products_section.dart';
 import 'package:j_food_updated/views/homescreen/widgets/restaurants_section.dart';
 import 'package:fancy_shimmer_image/fancy_shimmer_image.dart';
 import 'package:flutter/material.dart';
-import 'package:j_food_updated/stubs/fluttertoast_stub.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_dialogs/dialogs.dart';
 import 'package:material_dialogs/widgets/buttons/icon_button.dart';
@@ -1247,7 +1247,13 @@ class _SearchPageState extends State<SearchPage> {
                         }
                       } else {
                         Fluttertoast.showToast(
-                            msg: "لا يمكنك الطلب الان ،المحل مغلق");
+                            msg: "لا يمكنك الطلب الان ،المحل مغلق",
+                            toastLength: Toast.LENGTH_LONG,
+                            gravity: ToastGravity.BOTTOM,
+                            timeInSecForIosWeb: 3,
+                            backgroundColor: const Color(0xffE74C3C),
+                            textColor: Colors.white,
+                            fontSize: 16.0);
                       }
                     },
                     child: Container(

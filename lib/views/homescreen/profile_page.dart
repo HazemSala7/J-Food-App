@@ -11,7 +11,6 @@ import 'package:j_food_updated/views/resturant_page/restaurant_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:j_food_updated/stubs/fluttertoast_stub.dart';
-import 'package:lottie/lottie.dart';
 import 'package:persistent_bottom_nav_bar_v2/persistent_bottom_nav_bar_v2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1381,7 +1380,7 @@ class _ProfilePageState extends State<ProfilePage> {
           isLoading = false;
         });
 
-        widget.changeTab?.call(0);
+        widget.changeTab.call(0);
       } else {
         setState(() {
           isLoading = false;

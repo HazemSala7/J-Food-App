@@ -1,6 +1,4 @@
-import 'package:j_food_updated/views/storescreen/market_catergories.dart';
 import 'package:j_food_updated/views/storescreen/store_provider/store_provider.dart';
-import 'package:j_food_updated/stubs/fluttertoast_stub.dart';
 import 'package:j_food_updated/component/header/header.dart';
 import 'package:fancy_shimmer_image/fancy_shimmer_image.dart';
 import 'package:flutter/material.dart';
@@ -31,78 +29,111 @@ class _AllResturantsState extends State<AllResturants> {
 
   @override
   Widget build(BuildContext context) {
-bool isOpenByWorkingHours(Map store, DateTime now) {
-  final List<String> dayNames = [
-    'monday','tuesday','wednesday','thursday','friday','saturday','sunday'
-  ];
-  final String currentDay = dayNames[now.weekday - 1];
+    bool isOpenByWorkingHours(Map store, DateTime now) {
+      final List<String> dayNames = [
+        'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
+      ];
+      final String currentDay = dayNames[now.weekday - 1];
+      final String prevDay = dayNames[(now.weekday - 2) < 0 ? 6 : (now.weekday - 2)];
+      final List workingHours = (store['working_hours'] as List?) ?? [];
 
-  // ✅ correct key from API
-  final List workingHours = (store['working_hours'] as List?) ?? [];
+      Map<String, dynamic>? todaySchedule;
+      Map<String, dynamic>? prevDaySchedule;
+      if (workingHours.isNotEmpty) {
+        final foundToday = workingHours.firstWhere(
+          (s) => (s['day']?.toString().toLowerCase() == currentDay),
+          orElse: () => null,
+        );
+        if (foundToday != null) todaySchedule = Map<String, dynamic>.from(foundToday);
 
-  Map<String, dynamic>? todaySchedule;
-  if (workingHours.isNotEmpty) {
-    final found = workingHours.firstWhere(
-      (s) => (s['day']?.toString().toLowerCase() == currentDay),
-      orElse: () => null,
-    );
-    if (found != null) todaySchedule = Map<String, dynamic>.from(found);
-  }
+        final foundPrev = workingHours.firstWhere(
+          (s) => (s['day']?.toString().toLowerCase() == prevDay),
+          orElse: () => null,
+        );
+        if (foundPrev != null) prevDaySchedule = Map<String, dynamic>.from(foundPrev);
+      }
 
-  DateTime parseTimeSmart(String timeStr, DateTime ref) {
-    final parts = timeStr.split(':'); // supports HH:MM or HH:MM:SS
-    if (parts.length < 2) throw FormatException("Bad time: $timeStr");
-    return DateTime(ref.year, ref.month, ref.day, int.parse(parts[0]), int.parse(parts[1]));
-  }
+      DateTime parseTimeSmart(String timeStr, DateTime ref) {
+        final parts = timeStr.split(':');
+        if (parts.length < 2) throw FormatException("Bad time: $timeStr");
+        return DateTime(ref.year, ref.month, ref.day, int.parse(parts[0]), int.parse(parts[1]));
+      }
 
-  // ✅ choose times: working_hours today OR fallback open_time/close_time
-  String? openTimeString;
-  String? closeTimeString;
+      // Try today schedule first
+      String? openTimeString = todaySchedule?['start_time']?.toString();
+      String? closeTimeString = todaySchedule?['end_time']?.toString();
 
-  if (todaySchedule != null) {
-    openTimeString = todaySchedule!['start_time']?.toString();
-    closeTimeString = todaySchedule!['end_time']?.toString();
-  } else {
-    openTimeString = store['open_time']?.toString();
-    closeTimeString = store['close_time']?.toString();
-  }
+      // If not working today, fallback to open_time/close_time
+      if (openTimeString == null || closeTimeString == null) {
+        openTimeString = store['open_time']?.toString();
+        closeTimeString = store['close_time']?.toString();
+      }
 
-  if (openTimeString == null || closeTimeString == null) return false;
+      if (openTimeString == null || closeTimeString == null) return false;
 
-  try {
-    DateTime openTime = parseTimeSmart(openTimeString, now);
-    DateTime closeTime = parseTimeSmart(closeTimeString, now);
+      try {
+        DateTime openTime = parseTimeSmart(openTimeString, now);
+        DateTime closeTime = parseTimeSmart(closeTimeString, now);
 
-    // overnight
-    if (closeTime.isBefore(openTime)) {
-      closeTime = closeTime.add(const Duration(days: 1));
-      if (now.isBefore(openTime)) {
-        openTime = openTime.subtract(const Duration(days: 1));
+        // Case 1: Normal working hours (no overnight)
+        if (!closeTime.isBefore(openTime)) {
+          // Same day: closeTime >= openTime
+          if (now.isBefore(openTime)) {
+            return false; // Before opening time
+          }
+          if (now.isAfter(closeTime)) {
+            return false; // After closing time
+          }
+          return true; // Between open and close
+        }
+
+        // Case 2: Overnight working hours (closeTime < openTime means it extends past midnight)
+        // Example: 11:00 - 04:00 means opens 11:00 today, closes 04:00 tomorrow
+        
+        closeTime = closeTime.add(const Duration(days: 1));
+        
+        // Check if now is within today's working hours
+        if (now.isAfter(openTime) && now.isBefore(closeTime)) {
+          return true;
+        }
+        
+        // Check if now is before opening time (in early morning before next day opens)
+        if (now.isBefore(openTime)) {
+          // Only within previous day's overnight schedule if previous day ends after midnight
+          if (prevDaySchedule != null) {
+            String? prevOpen = prevDaySchedule['start_time']?.toString();
+            String? prevClose = prevDaySchedule['end_time']?.toString();
+            if (prevOpen != null && prevClose != null) {
+              DateTime prevOpenTime = parseTimeSmart(prevOpen, now.subtract(const Duration(days: 1)));
+              DateTime prevCloseTime = parseTimeSmart(prevClose, now.subtract(const Duration(days: 1)));
+              
+              // Only if previous day also has overnight schedule
+              if (prevCloseTime.isBefore(prevOpenTime)) {
+                prevCloseTime = prevCloseTime.add(const Duration(days: 1));
+                if (now.isAfter(prevOpenTime) && now.isBefore(prevCloseTime)) {
+                  return true;
+                }
+              }
+            }
+          }
+          return false;
+        }
+
+        return false;
+      } catch (_) {
+        return false;
       }
     }
 
-    // passed close -> shift window to next day
-    if (now.isAfter(closeTime)) {
-      openTime = openTime.add(const Duration(days: 1));
-      closeTime = closeTime.add(const Duration(days: 1));
-    }
-
-    return now.isAfter(openTime) && now.isBefore(closeTime);
-  } catch (_) {
-    return false;
-  }
-}
-
-    // Filter stores based on the selected tab (working hours + backend flag)
+    // Filter stores based on frontend schedule logic
     final DateTime now = DateTime.now();
     List filteredStores = widget.storesArray.where((store) {
-      final bool openByHours = isOpenByWorkingHours(store, now);
-      final bool openByBackend = store['is_open'] == true;
+      final bool openByFrontend = isOpenByWorkingHours(store, now);
 
       if (selectedTab == "مفتوح") {
-        return openByHours && openByBackend;
+        return openByFrontend;
       } else if (selectedTab == "مغلق") {
-        return !openByHours || !openByBackend;
+        return !openByFrontend;
       }
       return true;
     }).toList();
@@ -164,131 +195,101 @@ bool isOpenByWorkingHours(Map store, DateTime now) {
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            final bool isOpenFlag =
-                                filteredStores[index]['is_open'];
                             final DateTime now = DateTime.now();
-
-                            // Get current day name in lowercase
+                            final bool isOpenFlag = isOpenByWorkingHours(filteredStores[index], now);
                             final List<String> dayNames = [
-                              'monday',
-                              'tuesday',
-                              'wednesday',
-                              'thursday',
-                              'friday',
-                              'saturday',
-                              'sunday'
+                              'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
                             ];
-
                             final String currentDay = dayNames[now.weekday - 1];
-
-                            // Get restaurant working hours
-                            final List workingHours = filteredStores[index]
-                                    ['working_hours'] ??
-                                [];
-
-                            // Find today's working hours
+                            final String prevDay = dayNames[(now.weekday - 2) < 0 ? 6 : (now.weekday - 2)];
+                            final List workingHours = filteredStores[index]['working_hours'] ?? [];
                             final todaySchedule = workingHours.firstWhere(
                               (schedule) => schedule['day'] == currentDay,
                               orElse: () => null,
                             );
-
-                            // Check if restaurant doesn't work today
+                            final prevDaySchedule = workingHours.firstWhere(
+                              (schedule) => schedule['day'] == prevDay,
+                              orElse: () => null,
+                            );
                             bool notWorkingToday = todaySchedule == null;
-
                             String statusMessage;
                             int hoursLeft = 0, minutesLeft = 0;
                             bool almostClosing = false;
-                            bool isCurrentlyOpen = false;
+                            bool isCurrentlyOpen = isOpenFlag;
                             bool closedToday = false;
                             bool isWithinOperatingHours = false;
 
-                            if (notWorkingToday) {
-                              // Restaurant doesn't work on this day
-                              closedToday = true;
-                              statusMessage = "🚫 Closed today - day off";
-                            } else {
-                              // Parse today's working hours
-                              String openTimeString =
-                                  todaySchedule['start_time'];
-                              String closeTimeString =
-                                  todaySchedule['end_time'];
+                            DateTime parseTime(String timeStr, DateTime reference) {
+                              final parts = timeStr.split(":");
+                              return DateTime(reference.year, reference.month, reference.day, int.parse(parts[0]), int.parse(parts[1]));
+                            }
 
-                              if (openTimeString == null ||
-                                  closeTimeString == null ||
-                                  !openTimeString.contains(":") ||
-                                  !closeTimeString.contains(":")) {
-                                print(
-                                    "Error: Invalid time format in restaurant data.");
-                                return Container();
-                              }
-
-                              DateTime parseTime(
-                                  String timeStr, DateTime reference) {
-                                final parts = timeStr.split(":");
-                                return DateTime(
-                                    reference.year,
-                                    reference.month,
-                                    reference.day,
-                                    int.parse(parts[0]),
-                                    int.parse(parts[1]));
-                              }
-
-                              DateTime openTime =
-                                  parseTime(openTimeString, now);
-                              DateTime closeTime =
-                                  parseTime(closeTimeString, now);
-
-                              bool isOvernight = closeTime.isBefore(openTime);
+                            DateTime openTime, closeTime;
+                            bool isOvernight = false;
+                            // Overnight logic: check previous day's schedule if after midnight
+                            if (todaySchedule != null) {
+                              String openTimeString = todaySchedule['start_time'];
+                              String closeTimeString = todaySchedule['end_time'];
+                              openTime = parseTime(openTimeString, now);
+                              closeTime = parseTime(closeTimeString, now);
+                              isOvernight = closeTime.isBefore(openTime);
                               if (isOvernight) {
-                                closeTime =
-                                    closeTime.add(const Duration(days: 1));
-                                if (now.isBefore(openTime)) {
-                                  openTime = openTime
-                                      .subtract(const Duration(days: 1));
+                                closeTime = closeTime.add(const Duration(days: 1));
+                                if (now.isBefore(openTime) && prevDaySchedule != null) {
+                                  // Use previous day's schedule
+                                  String prevOpen = prevDaySchedule['start_time'];
+                                  String prevClose = prevDaySchedule['end_time'];
+                                  openTime = parseTime(prevOpen, now.subtract(const Duration(days: 1)));
+                                  closeTime = parseTime(prevClose, now.subtract(const Duration(days: 1)));
+                                  if (closeTime.isBefore(openTime)) {
+                                    closeTime = closeTime.add(const Duration(days: 1));
+                                  }
+                                } else if (now.isBefore(openTime)) {
+                                  openTime = openTime.subtract(const Duration(days: 1));
                                 }
                               }
-
-                              if (now.isAfter(closeTime)) {
-                                openTime =
-                                    openTime.add(const Duration(days: 1));
-                                closeTime =
-                                    closeTime.add(const Duration(days: 1));
+                            } else if (prevDaySchedule != null) {
+                              // If not working today, check previous day's overnight
+                              String prevOpen = prevDaySchedule['start_time'];
+                              String prevClose = prevDaySchedule['end_time'];
+                              openTime = parseTime(prevOpen, now.subtract(const Duration(days: 1)));
+                              closeTime = parseTime(prevClose, now.subtract(const Duration(days: 1)));
+                              if (closeTime.isBefore(openTime)) {
+                                closeTime = closeTime.add(const Duration(days: 1));
                               }
+                            } else {
+                              // fallback
+                              openTime = now;
+                              closeTime = now;
+                              notWorkingToday = true;
+                            }
 
-                              // Check if current time is within operating hours
-                              isWithinOperatingHours = now.isAfter(openTime) &&
-                                  now.isBefore(closeTime);
+                            if (now.isAfter(closeTime)) {
+                              openTime = openTime.add(const Duration(days: 1));
+                              closeTime = closeTime.add(const Duration(days: 1));
+                            }
 
-                              // Check if backend says it's open
-                              isCurrentlyOpen = isOpenFlag == true;
+                            isWithinOperatingHours = now.isAfter(openTime) && now.isBefore(closeTime);
+                            closedToday = isWithinOperatingHours && !isCurrentlyOpen;
 
-                              // Special case: within operating hours but backend says closed
-                              closedToday =
-                                  isWithinOperatingHours && !isCurrentlyOpen;
-
-                              if (closedToday) {
-                                // Special case: should be open by time, but manually closed
-                                statusMessage = "🚫 Closed today";
-                                almostClosing = false;
-                              } else if (isCurrentlyOpen) {
-                                final Duration remainingTime =
-                                    closeTime.difference(now);
-                                hoursLeft = remainingTime.inHours;
-                                minutesLeft =
-                                    remainingTime.inMinutes.remainder(60);
-                                statusMessage =
-                                    "🕒 Store is currently OPEN\n⏰ Closes in ${hoursLeft}h ${minutesLeft}m";
-                                almostClosing = remainingTime.inMinutes <= 90;
-                              } else {
-                                final Duration timeUntilOpen =
-                                    openTime.difference(now);
-                                hoursLeft = timeUntilOpen.inHours;
-                                minutesLeft =
-                                    timeUntilOpen.inMinutes.remainder(60);
-                                statusMessage =
-                                    "🕒 Store is currently CLOSED\n⏰ Opens in ${hoursLeft}h ${minutesLeft}m";
-                                almostClosing = false;
-                              }
+                            if (notWorkingToday) {
+                              closedToday = true;
+                              statusMessage = "اليوم المحل مغلق";
+                            } else if (closedToday) {
+                              statusMessage = "اليوم المحل مغلق";
+                              almostClosing = false;
+                            } else if (isCurrentlyOpen) {
+                              final Duration remainingTime = closeTime.difference(now);
+                              hoursLeft = remainingTime.inHours;
+                              minutesLeft = remainingTime.inMinutes.remainder(60);
+                              statusMessage = "يغلق بعد $hoursLeft:${minutesLeft.toString().padLeft(2, '0')} ساعة";
+                              almostClosing = remainingTime.inMinutes <= 90;
+                            } else {
+                              final Duration timeUntilOpen = openTime.difference(now);
+                              hoursLeft = timeUntilOpen.inHours;
+                              minutesLeft = timeUntilOpen.inMinutes.remainder(60);
+                              statusMessage = "يفتح بعد $hoursLeft:${minutesLeft.toString().padLeft(2, '0')} ساعة";
+                              almostClosing = false;
                             }
 
                             final bool canBuy = isCurrentlyOpen &&

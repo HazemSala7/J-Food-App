@@ -135,8 +135,8 @@ Widget _buildRestaurantCard(Map<String, dynamic> restaurant, BuildContext contex
   String? closeTimeString;
 
   if (todaySchedule != null) {
-    openTimeString = todaySchedule!['start_time']?.toString();
-    closeTimeString = todaySchedule!['end_time']?.toString();
+    openTimeString = todaySchedule['start_time']?.toString();
+    closeTimeString = todaySchedule['end_time']?.toString();
   } else {
     // ✅ fallback to open_time/close_time if working_hours empty or missing today
     openTimeString = restaurant['open_time']?.toString();
