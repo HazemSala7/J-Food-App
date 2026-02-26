@@ -1,9 +1,20 @@
+import java.util.Properties
+import java.io.FileInputStream
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// تحميل بيانات التوقيع من key.properties
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -32,11 +43,35 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        // أنشئ توقيع release من key.properties
+        create("release") {
+            val alias = keystoreProperties.getProperty("keyAlias")
+            val keyPwd = keystoreProperties.getProperty("keyPassword")
+            val storePwd = keystoreProperties.getProperty("storePassword")
+            val storePath = keystoreProperties.getProperty("storeFile") // مثال: D:\\keys\\upload-key.jks
+
+            if (storePath != null && alias != null && keyPwd != null && storePwd != null) {
+                storeFile = File(storePath)
+                keyAlias = alias
+                keyPassword = keyPwd
+                storePassword = storePwd
+            } else {
+                // لو الملف غير موجود أو القيم ناقصة، لا تضع توقيع لتتجنب أخطاء وقت البناء
+                println("WARNING: key.properties is missing or incomplete. Release will not be signed.")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // استخدم توقيع release الحقيقي (وليس debug)
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+        debug {
+            // يبقى كما هو
         }
     }
 }
