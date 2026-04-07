@@ -26,6 +26,7 @@ class CartBuilder {
       sizeId: sizeId ?? "",
       name: product['name'],
       productId: product['id'],
+      productNotes: product['productNotes'] != "" ? product['productNotes'] : "-",
       image: product['images'].isNotEmpty
           ? product['images'][0]['url']
           : '',

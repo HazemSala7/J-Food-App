@@ -13,6 +13,9 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 // import 'package:uni_links2/uni_links.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
 import 'LocalDB/Provider/CartProvider.dart';
 import 'LocalDB/Provider/PackageCartProvider.dart';
 import 'LocalDB/Provider/FavouriteProvider.dart';
@@ -51,9 +54,41 @@ Future<void> clearCache() async {
   }
 }
 
+Future<void> clearAllDataOnNewVersion() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    final savedVersion = prefs.getString('app_version');
+
+    if (savedVersion != null && savedVersion != currentVersion) {
+      // New version detected — clear everything
+      await prefs.clear();
+
+      // Delete SQLite database
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final dbPath = p.join(documentsDirectory.path, 'j_food_updated.db');
+      if (await File(dbPath).exists()) {
+        await deleteDatabase(dbPath);
+      }
+
+      // Clear cache
+      await clearCache();
+
+      print('All local data cleared for new version: $currentVersion');
+    }
+
+    // Save current version
+    await prefs.setString('app_version', currentVersion);
+  } catch (e) {
+    print('Error clearing data on new version: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await clearCache();
+  await clearAllDataOnNewVersion();
   
   try {
     setupLocalNotification();

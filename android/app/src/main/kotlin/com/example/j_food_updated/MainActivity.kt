@@ -1,4 +1,4 @@
-package j.food.com.jfood
+package j.food.com
 
 import io.flutter.embedding.android.FlutterActivity
 

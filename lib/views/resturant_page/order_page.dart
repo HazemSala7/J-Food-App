@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:j_food_updated/notifications/audio_service.dart';
 import 'package:j_food_updated/notifications/notification_service.dart';
 import 'package:j_food_updated/resources/api-const.dart';
@@ -276,8 +277,7 @@ class _OrderPageState extends State<OrderPage>
 
     if (newOrders.isNotEmpty) {
       for (var order in newOrders) {
-        // showNotification(order);
-        // notifiedOrderIds.add(order.id);
+        showNotification(order);
         saveNotifiedOrderId(order.id);
         _newOrderNotifier.value = order.id;
       }
@@ -286,22 +286,28 @@ class _OrderPageState extends State<OrderPage>
 
   Future<void> showNotification(Order order) async {
     await flutterLocalNotificationsPlugin.show(
-      0,
-      'هناك طلب جديد',
-      'رقم الطلب: ${order.id}.',
+      order.id,
+      '🔔 طلب جديد!',
+      'رقم الطلب: #${order.id} - يرجى التحقق فوراً',
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'channel id 2',
-          'Custom Notifications',
-          channelDescription:
-              'This channel is used for custom sound notifications',
+          'new_order_alert_channel',
+          'تنبيهات الطلبات الجديدة',
+          channelDescription: 'تنبيه صوتي عند وصول طلب جديد',
           importance: Importance.max,
           priority: Priority.high,
           sound: RawResourceAndroidNotificationSound('sound'),
           playSound: true,
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
+          fullScreenIntent: true,
+          ongoing: true,
+          autoCancel: false,
         ),
         iOS: DarwinNotificationDetails(
           sound: 'sound.wav',
+          presentAlert: true,
+          presentSound: true,
         ),
       ),
     );
@@ -323,53 +329,87 @@ class _OrderPageState extends State<OrderPage>
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        isDismissible: true,
-        enableDrag: true,
+        isDismissible: false,
+        enableDrag: false,
         backgroundColor: Colors.transparent,
         builder: (BuildContext context) {
-          return StatefulBuilder(
-            builder: (context, setState) {
-              return Container(
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
+          return PopScope(
+            canPop: false,
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
                   ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Center(
-                        child: Lottie.asset('assets/images/order.json'),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: mainColor,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: TextButton(
-                          onPressed: () {
-                            stopSound();
-                            Navigator.of(context).pop();
-                          },
-                          child: Text(
-                            "حسنا",
-                            style: TextStyle(color: Colors.white),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(height: 10),
+                        Text(
+                          "🔔 طلب جديد!",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: mainColor,
                           ),
                         ),
-                      ),
-                      SizedBox(height: 200),
-                    ],
+                        SizedBox(height: 10),
+                        Center(
+                          child: Lottie.asset('assets/images/order.json',
+                              height: 200),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "لديك طلب جديد، يرجى التحقق فوراً",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              stopSound();
+                              flutterLocalNotificationsPlugin.cancelAll();
+                              Navigator.of(context).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: mainColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              "تم الاطلاع ✓",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ).whenComplete(() {
+        stopSound();
+        flutterLocalNotificationsPlugin.cancelAll();
         setState(() {
           _isAnimationShowing = false;
         });
@@ -443,17 +483,17 @@ class _OrderPageState extends State<OrderPage>
       final response = await http.post(
         Uri.parse('https://hrsps.com/login/api/change_order_status'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'order_id': orderId, 'status': status}),
+        body: jsonEncode({
+          'order_id': orderId,
+          'status': status,
+          'send_notification': true,
+          'notification_title': 'تحديث بخصوص حالة الطلب',
+          'notification_body': msg,
+        }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         await fetchOrders(getStatusFromIndex(selectedTabIndex), false);
-
-        await sendNotification(
-          userIds: [userId],
-          title: 'تحديث بخصوص حالة الطلب',
-          body: msg,
-        );
       } else {
         throw Exception('Failed to change order status');
       }
@@ -719,18 +759,18 @@ class _OrderPageState extends State<OrderPage>
                 return buildOrderCard(previousOrders[index]);
               },
             ),
-            // ValueListenableBuilder<int?>(
-            //   valueListenable: _newOrderNotifier,
-            //   builder: (context, orderId, _) {
-            //     if (orderId != null) {
-            //       WidgetsBinding.instance.addPostFrameCallback((_) {
-            //         showLottieAnimation();
-            //         _newOrderNotifier.value = null;
-            //       });
-            //     }
-            //     return SizedBox.shrink();
-            //   },
-            // ),
+            ValueListenableBuilder<int?>(
+              valueListenable: _newOrderNotifier,
+              builder: (context, orderId, _) {
+                if (orderId != null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    showLottieAnimation();
+                    _newOrderNotifier.value = null;
+                  });
+                }
+                return SizedBox.shrink();
+              },
+            ),
           ],
         );
       },
@@ -852,11 +892,11 @@ class _OrderPageState extends State<OrderPage>
                                                   storeData!["restaurant"] !=
                                                       null &&
                                                   storeData!["restaurant"][
-                                                          "j.food.com.jfood"] !=
+                                                          "j.food.com"] !=
                                                       null
                                               ? jsonEncode(storeData![
                                                       "restaurant"]
-                                                  ["j.food.com.jfood"])
+                                                  ["j.food.com"])
                                               : '[]',
                                           isOpen: storeData != null &&
                                                   storeData!["restaurant"] !=
@@ -1313,7 +1353,8 @@ class _OrderPageState extends State<OrderPage>
                     if (_dragOffsets.length <= index) {
                       _dragOffsets.add(0.0);
                     }
-                    return Stack(children: [
+                    return Column(children: [
+                      Stack(children: [
                       Visibility(
                         visible: order.status == "pending",
                         child: Container(
@@ -1396,186 +1437,242 @@ class _OrderPageState extends State<OrderPage>
                                   ),
                                 ],
                               ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Column(
                                 children: [
-                                  Container(
-                                    width: 80,
-                                    height: 80,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      color: Colors.grey[200],
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        item.product.image,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.product.name,
-                                          style: TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xff5E5E5E),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 80,
+                                        height: 80,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(8),
+                                          color: Colors.grey[200],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            item.product.image,
+                                            fit: BoxFit.cover,
                                           ),
                                         ),
-                                        Row(
+                                      ),
+                                      SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              "الكمية : ",
+                                              item.product.name,
                                               style: TextStyle(
+                                                fontSize: 17,
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                                color: mainColor,
+                                                color: Color(0xff5E5E5E),
                                               ),
                                             ),
-                                            Flexible(
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  "الكمية : ",
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                    color: mainColor,
+                                                  ),
+                                                ),
+                                                Flexible(
+                                                  child: Text(
+                                                    item.qty,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: textColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Visibility(
+                                              visible: item.size.size != "",
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  SizedBox(height: 2),
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        "الحجم : ",
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 14,
+                                                          color: mainColor,
+                                                        ),
+                                                      ),
+                                                      Flexible(
+                                                        child: Text(
+                                                          item.size.size,
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            color: textColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Visibility(
+                                              visible: item.components.isNotEmpty,
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  SizedBox(height: 2),
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        "المكونات : ",
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 14,
+                                                          color: mainColor,
+                                                        ),
+                                                      ),
+                                                      Flexible(
+                                                        child: Text(
+                                                          item.componentsAsString,
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: textColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Visibility(
+                                              visible: item.drinks.isNotEmpty,
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        "المشروبات: ",
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 14,
+                                                          color: mainColor,
+                                                        ),
+                                                      ),
+                                                      Flexible(
+                                                        child: Text(
+                                                          item.drinksAsString,
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: textColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                    color: Color(0xffEAEAEA)),
+                                              ),
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: 6, vertical: 1),
                                               child: Text(
-                                                item.qty,
-                                                overflow: TextOverflow.ellipsis,
+                                                "₪${item.totalPrice}",
                                                 style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: textColor,
+                                                  color: mainColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
                                                 ),
                                               ),
                                             ),
                                           ],
                                         ),
-                                        Visibility(
-                                          visible: item.size.size != "",
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              SizedBox(height: 2),
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    "الحجم : ",
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                      color: mainColor,
-                                                    ),
-                                                  ),
-                                                  Flexible(
-                                                    child: Text(
-                                                      item.size.size,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        color: textColor,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Visibility(
-                                          visible: item.components.isNotEmpty,
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              SizedBox(height: 2),
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    "المكونات : ",
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                      color: mainColor,
-                                                    ),
-                                                  ),
-                                                  Flexible(
-                                                    child: Text(
-                                                      item.componentsAsString,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: textColor,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Visibility(
-                                          visible: item.drinks.isNotEmpty,
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    "المشروبات: ",
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                      color: mainColor,
-                                                    ),
-                                                  ),
-                                                  Flexible(
-                                                    child: Text(
-                                                      item.drinksAsString,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: textColor,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                                color: Color(0xffEAEAEA)),
-                                          ),
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 1),
-                                          child: Text(
-                                            "₪${item.totalPrice}",
-                                            style: TextStyle(
-                                              color: mainColor,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                      ),
+                                    ],
+                                  ),
+                                if (item.productNotes != null &&
+                          item.productNotes != '-' &&
+                          item.productNotes != '0' &&
+                          item.productNotes!.isNotEmpty)
+                        Container(
+                          margin: EdgeInsets.only(bottom: 5 , top: 15 ),
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: mainColor,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.arrow_drop_down,
+                                      color: Colors.white, size: 20),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    "ملاحظات",
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
+                                ],
+                              ),
+                              Padding(
+                              padding: EdgeInsets.only(bottom: 5),
+                              child: Row(
+                                 mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.productNotes!,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ],
+                          ),
+                        ),
                                 ],
                               ),
                             ),
                           ),
                         ),
                       ),
+                    ]),
+                      
                     ]);
                   }),
               Padding(

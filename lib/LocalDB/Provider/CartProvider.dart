@@ -19,9 +19,19 @@ class CartProvider extends ChangeNotifier {
   }
 
   Future<void> addToCart(CartItem item) async {
+    print('=== CART PROVIDER addToCart - NOTES DEBUG ===');
+    print('Item: ${item.name}');
+    print('Note: ${item.note}');
+    print('ProductNotes: ${item.productNotes}');
+    print('=============================================');
     await _dbHelper.insertCartItem(item);
     _cartItems.add(item);
     _cartItems = await _dbHelper.getCartItems();
+    print('=== AFTER DB RELOAD - NOTES DEBUG ===');
+    for (var cartItem in _cartItems) {
+      print('Item: ${cartItem.name}, Note: ${cartItem.note}, ProductNotes: ${cartItem.productNotes}');
+    }
+    print('=====================================');
     notifyListeners();
   }
 
@@ -198,7 +208,14 @@ class CartProvider extends ChangeNotifier {
         'selected_components_qty': item.selected_components_qty.isNotEmpty
             ? item.selected_components_qty
             : ['0'],
+        'note': item.note ?? '',
+        'product_notes': item.productNotes,
       };
+      print('=== getProductsArray - NOTES DEBUG ===');
+      print('Item: ${item.name}');
+      print('Note in map: ${productData["note"]}');
+      print('ProductNotes in map: ${productData["product_notes"]}');
+      print('======================================');
       productsArray.add(productData);
     }
 

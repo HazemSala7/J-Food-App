@@ -69,7 +69,7 @@ class PackageCartItem {
   final List<String> selected_drinks_id;
   final String storeOpenTime;
   final String storeCloseTime;
-  final String workingHours; // JSON string of j.food.com.jfood array
+  final String workingHours; // JSON string of j.food.com array
   final bool isOpen; // Current is_open status
 
   PackageCartItem({

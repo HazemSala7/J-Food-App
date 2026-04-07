@@ -11,7 +11,7 @@ import '../Models/FavoriteItem.dart';
 
 class CartDatabaseHelper {
   static final CartDatabaseHelper _instance = CartDatabaseHelper._internal();
-  static final int dbVersion = 32; // Increment for cart working hours
+  static final int dbVersion = 37; // Fix product_notes column name
 
   factory CartDatabaseHelper() => _instance;
 
@@ -61,6 +61,7 @@ class CartDatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         productId INTEGER NOT NULL,
         name TEXT NOT NULL,
+        product_notes TEXT NOT NULL,
         image TEXT NOT NULL,
         price TEXT NOT NULL,
         size TEXT NOT NULL,
@@ -206,6 +207,7 @@ class CartDatabaseHelper {
     return await db!.insert('cart', {
       'productId': item.productId,
       'name': item.name,
+      'product_notes': item.productNotes,
       'total': item.total,
       'price': item.price,
       'size': item.size,

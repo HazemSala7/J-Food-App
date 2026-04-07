@@ -63,6 +63,7 @@ class StoreProvider extends ChangeNotifier {
 
       allProducts = storeData!["products"]["data"] ?? [];
       allPackages = storeData!["restaurant"]["restaurant_packages"];
+      _sortProductsBySubCategory();
       displayedProducts = List.from(allProducts);
       displayedPackages = List.from(allPackages);
       restaurantStories = storeData!["stories"] ?? [];
@@ -96,6 +97,7 @@ class StoreProvider extends ChangeNotifier {
 
         // Create new lists instead of modifying existing ones to avoid render conflicts
         allProducts = List.from(allProducts)..addAll(newProducts);
+        _sortProductsBySubCategory();
 
         // Only update displayed products if not filtered
         if (selectedCategory == "الكل") {
@@ -170,6 +172,23 @@ class StoreProvider extends ChangeNotifier {
         showSuccessMessage = false;
         safeNotifyListeners(); // ✅ check before notifying
       }
+    });
+  }
+
+  // =================== SORT PRODUCTS BY SUBCATEGORY ORDER ===================
+  void _sortProductsBySubCategory() {
+    if (apiSubCategories == null || apiSubCategories!.isEmpty) return;
+
+    // Build order map from apiSubCategories (skip "الكل" at index 0)
+    final Map<int, int> categoryOrder = {};
+    for (int i = 0; i < apiSubCategories!.length; i++) {
+      categoryOrder[apiSubCategories![i]["id"] as int] = i;
+    }
+
+    allProducts.sort((a, b) {
+      final int orderA = categoryOrder[a["sub_category_id"]] ?? 9999;
+      final int orderB = categoryOrder[b["sub_category_id"]] ?? 9999;
+      return orderA.compareTo(orderB);
     });
   }
 

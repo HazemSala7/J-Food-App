@@ -46,6 +46,7 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
   late final GifController controller;
   bool emptyName = false;
   bool emptyArea = false;
+  bool emptyNearof = false;
   double lati = 31;
   double longi = 31;
   String? payment;
@@ -466,8 +467,18 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
 
           double finalTotal = itemBaseTotal + componentTotal + drinkTotal;
 
+          print('=== CHECKOUT - NOTES DEBUG ===');
+          print('Item: ${item["name"]}');
+          print('item["note"]: ${item["note"]}');
+          print('item["product_notes"]: ${item["product_notes"]}');
+          print('product_id: ${item["product_id"]}');
+          print('==============================');
+
           Map<String, dynamic> product = {
             "product_type": "product",
+            "product_notes": item["product_id"] == "0"
+                ? item["note"] != "" ? item["note"] : "-"
+                : item["note"] != "" ? item["note"] : "0",
             "product_id": item["product_id"],
             "price": double.parse(item["price"].toString()),
             "size_id": item["sizeId"] != "" ? item["sizeId"] : "0",
@@ -1137,17 +1148,18 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
                           child: TextField(
                             controller: nearofController,
                             obscureText: false,
+                            onChanged: (value) {
+                              if (emptyNearof && value.isNotEmpty) {
+                                setState(() {
+                                  emptyNearof = false;
+                                });
+                              }
+                            },
                             decoration: InputDecoration(
-                              // contentPadding: EdgeInsets.only(
-                              //     bottom: 10, top: 12, left: 2, right: 2),
                               hintStyle: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xffD0D0D0),
                               ),
-                              // prefixIcon: Icon(
-                              //   Icons.near_me,
-                              //   color: Color(0xff428fc6),
-                              // ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide:
@@ -1157,7 +1169,7 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
                                   width: 2.0,
-                                  color: Color(0xffD0D0D0),
+                                  color: emptyNearof ? Colors.red : Color(0xffD0D0D0),
                                 ),
                               ),
                               hintText: "بالقرب من",
@@ -1418,7 +1430,8 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
                                 if (nameController.text.isEmpty ||
                                     selectedArea == null ||
                                     payment == null ||
-                                    phoneController.text.isEmpty) {
+                                    phoneController.text.isEmpty ||
+                                    nearofController.text.isEmpty) {
                                   if (nameController.text.isEmpty) {
                                     setState(() {
                                       emptyName = true;
@@ -1432,6 +1445,11 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
                                   if (selectedArea == null) {
                                     setState(() {
                                       emptyArea = true;
+                                    });
+                                  }
+                                  if (nearofController.text.isEmpty) {
+                                    setState(() {
+                                      emptyNearof = true;
                                     });
                                   }
                                   await showDialog(
@@ -1498,6 +1516,10 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
                                     await addOrder();
                                   } catch (e) {
                                     print('Error submitting order: $e');
+                                    Fluttertoast.showToast(
+                                      msg: '$e',
+                                      timeInSecForIosWeb: 4,
+                                    );
                                   } finally {
                                     setState(() {
                                       isSubmitting = false;

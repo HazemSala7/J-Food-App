@@ -392,6 +392,7 @@ class _ItemWidgetState extends State<ItemWidget> {
       return;
     }
     final productData = widget.data[index];
+    final String productNotes = productData["product_notes"] ?? '-';
     List<String> allComponentsNames = [];
     List<String> allComponentsImages = [];
     List<String> allComponentsPrices = [];
@@ -549,6 +550,7 @@ class _ItemWidgetState extends State<ItemWidget> {
           selected_drinks_names: orderDrinksNames,
           selected_drinks_prices: orderDrinksPrices,
           name: productData["name"] ?? 'Unnamed Product',
+          productNotes: productData["product_notes"] ?? '-',
           productId: productData["id"] ?? 0,
           image: productData['images'].isNotEmpty
               ? productData['images'][0]['url'] ??
@@ -566,6 +568,12 @@ class _ItemWidgetState extends State<ItemWidget> {
           note: noteControllers[index].text.isEmpty
               ? null
               : noteControllers[index].text);
+
+      print('=== ADD TO CART - NOTES DEBUG ===');
+      print('Item: ${newItem.name}');
+      print('Note: ${newItem.note}');
+      print('ProductNotes: ${newItem.productNotes}');
+      print('================================');
 
       // Add the current order to the cart
       cartProvider.addToCart(newItem);

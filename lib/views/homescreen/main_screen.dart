@@ -6,23 +6,27 @@ import 'package:j_food_updated/component/header/header.dart';
 import 'package:j_food_updated/constants/constants.dart';
 import 'package:j_food_updated/models/slider_model.dart';
 import 'package:j_food_updated/resources/api-const.dart';
+import 'package:j_food_updated/server/functions/functions.dart';
 import 'package:j_food_updated/views/homescreen/widgets/category.dart';
 import 'package:j_food_updated/views/homescreen/widgets/pre_order_resturant.dart';
 import 'package:j_food_updated/views/homescreen/widgets/slider.dart';
 import 'package:j_food_updated/views/homescreen/widgets/special_resturants.dart';
+import 'package:j_food_updated/views/orders_screen/home_order_details_screen.dart';
 import 'package:fancy_shimmer_image/fancy_shimmer_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen(
-      {super.key,
-      this.changeDelivery,
-      required this.noDelivery,
-      this.changeRamadanTime,
-      this.changeAppError,
-      required this.changeTab});
+  const MainScreen({
+    super.key,
+    this.changeDelivery,
+    required this.noDelivery,
+    this.changeRamadanTime,
+    this.changeAppError,
+    required this.changeTab,
+  });
   final Function? changeDelivery;
   final Function? changeRamadanTime;
   final Function? changeAppError;
@@ -44,6 +48,8 @@ class _MainScreenState extends State<MainScreen>
   late Stream<ConnectivityResult> connectivityStream;
   final Connectivity _connectivity = Connectivity();
   late StreamController<ConnectivityResult> _connectivityController;
+  late Future<Map<String, dynamic>?> _currentOrderFuture;
+  Map<String, dynamic>? _currentOrderFromHome;
 
   @override
   void initState() {
@@ -63,13 +69,15 @@ class _MainScreenState extends State<MainScreen>
     _checkConnectivity();
 
     connectivityStream = _connectivityController.stream;
+    _currentOrderFuture = _fetchCurrentOrder();
   }
 
   Future<void> _checkConnectivity() async {
     try {
       final result = await _connectivity.checkConnectivity();
-      final connectivityResult =
-          result.isNotEmpty ? result.first : ConnectivityResult.none;
+      final connectivityResult = result.isNotEmpty
+          ? result.first
+          : ConnectivityResult.none;
       _connectivityController.add(connectivityResult);
     } catch (e) {
       print('Error checking connectivity: $e');
@@ -113,6 +121,347 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
+  Future<Map<String, dynamic>?> _fetchCurrentOrder() async {
+    try {
+      final data = await getHomeDataList();
+
+      if (data == null || data is! Map) {
+        return null;
+      }
+
+      final dynamic hasOrder = data['has_order'];
+      if (data['current_order'] is Map<String, dynamic> &&
+          (hasOrder == null ||
+              hasOrder == true ||
+              hasOrder == 1 ||
+              hasOrder == "1")) {
+        final currentOrder = Map<String, dynamic>.from(
+          data['current_order'] as Map,
+        );
+        // Only return if it's an active order
+        if (_isActiveOrder(currentOrder)) {
+          return currentOrder;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching current order: $e');
+      return null;
+    }
+  }
+
+  bool _isActiveOrder(Map<String, dynamic> order) {
+    final String status = (order['status'] ?? '').toString();
+    return status == 'pending' ||
+        status == 'in_progress' ||
+        status == 'ready_for_delivery' ||
+        status == 'in_delivery';
+  }
+
+  String _getOrderStatusText(String status, String checkoutType) {
+    switch (status) {
+      case "pending":
+        return "قيد المعالجة";
+      case "in_progress":
+        return "قيد التجهيز";
+      case "ready_for_delivery":
+        return checkoutType == "pickup" ? "جاهز للاستلام" : "جاهز للتوصيل";
+      case "delivered":
+        return "تم التوصيل";
+      case "in_delivery":
+        return checkoutType == "pickup" ? "تم الاستلام" : "في التوصيل";
+      case "canceled":
+        return "تم الغائه";
+      default:
+        return "تم رفضه";
+    }
+  }
+
+  String _getOrderStatusIcon(String status, String checkoutType) {
+    if (status == "pending") return "assets/images/order-ready.png";
+    if (status == "in_progress") return "assets/images/in-work.png";
+    if (status == "ready_for_delivery") return "assets/images/in-work.png";
+    if (status == "in_delivery") {
+      return checkoutType == "pickup"
+          ? "assets/images/delivery-done.png"
+          : "assets/images/in-delivery.png";
+    }
+    return "assets/images/delivery-done.png";
+  }
+
+  Widget _buildCurrentOrderSection() {
+    if (_currentOrderFromHome != null) {
+      return _buildCurrentOrderCard(_currentOrderFromHome!);
+    }
+
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _currentOrderFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+
+        final order = snapshot.data;
+        if (order == null) return const SizedBox.shrink();
+
+        return _buildCurrentOrderCard(order);
+      },
+    );
+  }
+
+  int _getStatusStep(String status) {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'in_progress':
+        return 1;
+      case 'ready_for_delivery':
+        return 2;
+      case 'in_delivery':
+        return 3;
+      default:
+        return 0;
+    }
+  }
+
+  Widget _buildStatusDots(int currentStep) {
+    const int totalSteps = 4;
+    return Row(
+      children: List.generate(totalSteps, (index) {
+        final bool isActive = index <= currentStep;
+        final bool isCurrent = index == currentStep;
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(left: index < totalSteps - 1 ? 4 : 0),
+            height: 4,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              color: isActive
+                  ? Colors.white
+                  : Colors.white.withOpacity(0.25),
+              boxShadow: isCurrent
+                  ? [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.5),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : [],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildCurrentOrderCard(Map<String, dynamic> order) {
+    final int orderId = order['id'] ?? 0;
+    final String status = order['status'] ?? 'unknown';
+    final String checkoutType = order['checkout_type'] ?? 'unknown';
+    final String statusText = _getOrderStatusText(status, checkoutType);
+    final String storeName = order['restaurant']?['name'] ?? "";
+    final String orderNumber = (order['id'] ?? '').toString();
+    final int statusStep = _getStatusStep(status);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeOrderDetailsScreen(
+                orderId: orderId,
+                status: status,
+                checkoutType: checkoutType,
+              ),
+            ),
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                mainColor,
+                mainColor.withOpacity(0.85),
+                const Color(0xffB83634),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: mainColor.withOpacity(0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+                spreadRadius: -2,
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Decorative circle
+              Positioned(
+                left: -20,
+                top: -20,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.07),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 30,
+                bottom: -15,
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.05),
+                  ),
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: Image.asset(
+                            _getOrderStatusIcon(status, checkoutType),
+                            width: 26,
+                            height: 26,
+                            color: Colors.white,
+                            colorBlendMode: BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      "لديك طلبية حالية",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15.5,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          "تتبع",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11.5,
+                                            color: Colors.white.withOpacity(0.95),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 10,
+                                          color: Colors.white.withOpacity(0.9),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                "#$orderNumber${storeName.isNotEmpty ? "  •  $storeName" : ""}",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12.5,
+                                  color: Colors.white.withOpacity(0.8),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Progress bar
+                    _buildStatusDots(statusStep),
+                    const SizedBox(height: 8),
+                    // Status label
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xffFFC509),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xffFFC509).withOpacity(0.6),
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          statusText,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: Colors.white.withOpacity(0.95),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Stream<Map<String, dynamic>> homeDataStream() async* {
     while (true) {
       yield await getHomeDataList();
@@ -122,19 +471,28 @@ class _MainScreenState extends State<MainScreen>
 
   Future<Map<String, dynamic>> getHomeDataList() async {
     try {
-      var response = await http.get(Uri.parse(AppLink.homeData));
+      final prefs = await SharedPreferences.getInstance();
+      final String userId = prefs.getString('user_id') ?? "";
+
+      Uri homeUri = Uri.parse(AppLink.homeData);
+      if (userId.isNotEmpty) {
+        homeUri = homeUri.replace(queryParameters: {'user_id': userId});
+      }
+
+      var response = await http.get(homeUri);
       if (response.statusCode == 200 || response.statusCode == 201) {
         var res = json.decode(response.body);
 
         if (res is Map<String, dynamic>) {
-          res['sliders'] = res['sliders'] ??
+          res['sliders'] =
+              res['sliders'] ??
               [
                 {
                   "id": 59,
                   "url":
                       "https://hrsps.com/login/storage/Sliders-Talabat/Ojr4wmEZKMxwSVnJabBBkigTkQilA4hfDEJQw9IO.jpg",
                   "type": "restaurent",
-                  "data_id": 127
+                  "data_id": 127,
                 },
               ];
           res['special_restaurensts'] = res['special_restaurensts'] ?? [];
@@ -147,7 +505,7 @@ class _MainScreenState extends State<MainScreen>
       } else if (response.statusCode == 500) {
         return {
           'error': 'server',
-          'message': 'There is an error in the server, it will be solved soon.'
+          'message': 'There is an error in the server, it will be solved soon.',
         };
       } else {
         print('Unexpected response: ${response.statusCode}');
@@ -222,8 +580,9 @@ class _MainScreenState extends State<MainScreen>
           const SizedBox(height: 10),
           MaterialButton(
             color: mainColor,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             onPressed: () {
               // Check connectivity when retry is pressed
               _checkConnectivity();
@@ -269,6 +628,25 @@ class _MainScreenState extends State<MainScreen>
       });
     }
 
+    final dynamic hasOrder = data['has_order'];
+    if (data['current_order'] is Map<String, dynamic> &&
+        (hasOrder == null ||
+            hasOrder == true ||
+            hasOrder == 1 ||
+            hasOrder == "1")) {
+      final currentOrder = Map<String, dynamic>.from(
+        data['current_order'] as Map,
+      );
+      // Only show the order if it's not delivered
+      if (_isActiveOrder(currentOrder)) {
+        _currentOrderFromHome = currentOrder;
+      } else {
+        _currentOrderFromHome = null;
+      }
+    } else {
+      _currentOrderFromHome = null;
+    }
+
     return _buildHomeContent(context, data, sliders, ramadanTime);
   }
 
@@ -288,7 +666,10 @@ class _MainScreenState extends State<MainScreen>
           displacement: 40,
           strokeWidth: 3.0,
           onRefresh: () async {
-            setState(() {});
+            setState(() {
+              _currentOrderFromHome = null;
+              _currentOrderFuture = _fetchCurrentOrder();
+            });
             await Future.delayed(const Duration(milliseconds: 500));
           },
           child: CustomScrollView(
@@ -316,6 +697,7 @@ class _MainScreenState extends State<MainScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
+                    _buildCurrentOrderSection(),
                     _buildSliderSection(context, sliders),
                     _buildSpecialRestaurantsSection(data, ramadanTime),
                     _buildRamadanRestaurantsSection(data, ramadanTime),
@@ -359,7 +741,6 @@ class _MainScreenState extends State<MainScreen>
   }
 
   Widget _buildSpecialRestaurantsSection(Map data, bool ramadanTime) {
-    
     if (data['special_restaurensts'] == null ||
         data['special_restaurensts'].isEmpty) {
       return const SizedBox.shrink();
@@ -437,9 +818,7 @@ class _MainScreenState extends State<MainScreen>
         children: [
           Row(
             children: [
-              SizedBox(
-                width: 15,
-              ),
+              SizedBox(width: 15),
               Text(
                 ramadanTime ? "الماركت" : "الأقسام الرئيسية",
                 style: const TextStyle(
@@ -506,7 +885,9 @@ class _MainScreenState extends State<MainScreen>
         backgroundColor: Colors.transparent,
         builder: (BuildContext context) {
           return _CloseAppSheet(
-              description: description, onConfirm: widget.changeDelivery!);
+            description: description,
+            onConfirm: widget.changeDelivery!,
+          );
         },
       );
     });
@@ -521,23 +902,28 @@ class _MainScreenState extends State<MainScreen>
             Text(
               "حدث خطأ اثناء تحميل البيانات",
               style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold, color: mainColor),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: mainColor,
+              ),
             ),
             MaterialButton(
               onPressed: () {
                 setState(() {});
               },
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               color: mainColor,
               child: Text(
                 "حاول مرة اخرى",
                 style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),

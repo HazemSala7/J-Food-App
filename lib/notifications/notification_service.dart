@@ -53,6 +53,21 @@ void setupLocalNotification() {
             importance: Importance.high,
           ),
         );
+
+    flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'new_order_alert_channel',
+            'تنبيهات الطلبات الجديدة',
+            description: 'تنبيه صوتي عند وصول طلب جديد',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
+
     print('Local notifications initialized successfully');
   } catch (e) {
     print('Error initializing local notifications: $e');
@@ -80,7 +95,6 @@ Future<void> showBigTextNotification(
     priority: Priority.high,
     styleInformation: bigTextStyleInformation,
     playSound: true,
-    sound: RawResourceAndroidNotificationSound('notification'),
   );
 
   const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -148,7 +162,6 @@ Future<void> showOrderStatusNotification(
         priority: Priority.high,
         playSound: true,
         styleInformation: bigTextStyleInformation,
-        sound: RawResourceAndroidNotificationSound('notification'),
       );
 
       NotificationDetails platformChannelSpecifics = NotificationDetails(

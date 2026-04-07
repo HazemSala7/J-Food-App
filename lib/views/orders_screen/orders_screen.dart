@@ -460,6 +460,7 @@ class _OrderCardState extends State<OrderCard> {
           final product = orderDetail['product'] ?? {};
           final int productId = product['id'] ?? 0;
           final String productName = product['name'] ?? 'Unnamed Product';
+          final String productNotes = product['product_notes'] ?? '-';
           final String size = orderDetail['size']['size'] ?? '';
           final String productPrice = product['price']?.toString() ?? '0';
           final String productImage =
@@ -547,6 +548,7 @@ class _OrderCardState extends State<OrderCard> {
             price: productPrice,
             size: size,
             name: productName,
+            productNotes: productNotes,
             productId: productId,
             image: productImage,
             quantity: quantity,

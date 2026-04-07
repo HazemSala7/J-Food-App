@@ -8,7 +8,7 @@ class FavoriteItem {
   final String openTime;
   final String closeTime;
   final String storeLocation;
-  final String workingHours; // JSON string of j.food.com.jfood array
+  final String workingHours; // JSON string of j.food.com array
   final bool isOpen; // Current is_open status
 
   FavoriteItem({

@@ -2,6 +2,7 @@ class CartItem {
   final int? id;
   final int productId;
   final String name;
+  final String productNotes;
   final String image;
   final String? size;
   final String? sizeId;
@@ -14,7 +15,7 @@ class CartItem {
   final String storeCloseTime;
   final String storeLocation;
   final String storeDeliveryPrice;
-  final String workingHours; // JSON string of j.food.com.jfood array
+  final String workingHours; // JSON string of j.food.com array
   final bool isOpen; // Current is_open status
   final List<String> components_names;
   final List<String> components_prices;
@@ -39,6 +40,7 @@ class CartItem {
     this.id,
     required this.productId,
     required this.name,
+    required this.productNotes,
     required this.storeID,
     required this.storeName,
     required this.storeDeliveryPrice,
@@ -78,6 +80,7 @@ class CartItem {
       'id': id,
       'productId': productId,
       'name': name,
+      'product_notes': productNotes,
       'storeID': storeID,
       'storeName': storeName,
       'storeDeliveryPrice': storeDeliveryPrice,
@@ -134,6 +137,7 @@ class CartItem {
       id: json['id'],
       productId: json['productId'] ?? 0,
       name: json['name'] ?? 'Unknown',
+      productNotes: json['product_notes'] ?? '',
       storeID: json['storeID'] ?? '',
       storeName: json['storeName'] ?? 'Unknown Store',
       storeCloseTime: json['storeCloseTime'] ?? 'Unknown close',

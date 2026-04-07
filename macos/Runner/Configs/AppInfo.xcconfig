@@ -8,7 +8,7 @@
 PRODUCT_NAME = j_food_updated
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = j.food.com.jfoodUpdated
+PRODUCT_BUNDLE_IDENTIFIER = j.food.comUpdated
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.

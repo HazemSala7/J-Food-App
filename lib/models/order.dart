@@ -148,6 +148,7 @@ class Item {
   final String price;
   final String qty;
   final String sum;
+  final String? productNotes;
   final Product product;
   final Size size;
   final List<Drink> drinks;
@@ -163,6 +164,7 @@ class Item {
     required this.price,
     required this.qty,
     required this.sum,
+    this.productNotes,
     required this.product,
     required this.size,
     required this.drinks,
@@ -243,6 +245,7 @@ class Item {
       price: json['price'] ?? '0',
       qty: json['qty'] ?? '0',
       sum: json['sum'] ?? '0',
+      productNotes: json['product_notes'],
       product: Product.fromJson(json['product'] ?? {}),
       drinks: drinks,
       size: Size.fromJson(json['size'] ?? {}),

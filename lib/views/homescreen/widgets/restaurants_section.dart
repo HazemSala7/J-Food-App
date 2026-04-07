@@ -75,7 +75,7 @@ class _RestaurantCard extends StatelessWidget {
     final String currentDay = dayNames[now.weekday - 1];
 
     // Get restaurant working hours
-    final List workingHours = restaurant['j.food.com.jfood'] ?? [];
+    final List workingHours = restaurant['working_hours'] ?? [];
 
     // Find today's working hours
     final todaySchedule = workingHours.firstWhere(
@@ -92,7 +92,10 @@ class _RestaurantCard extends StatelessWidget {
     bool almostClosing = false;
 
     if (notWorkingToday) {
-      closedToday = true;
+      // No schedule for today — fall back to backend is_open flag
+      bool backendIsOpen = restaurant['is_open'] == true;
+      isOpen = backendIsOpen;
+      closedToday = !backendIsOpen;
     } else {
       // Parse today's working hours
       String? openTimeStr = todaySchedule['start_time'];

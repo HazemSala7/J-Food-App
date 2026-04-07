@@ -1282,6 +1282,7 @@ class _UserOrderDetailsState extends State<UserOrderDetails> {
           final product = orderDetail['product'] ?? {};
           final int productId = product['id'] ?? 0;
           final String productName = product['name'] ?? 'Unnamed Product';
+          final String productNotes = product['product_notes'] ?? '-';
           final String size = orderDetail['size']['size'] ?? '';
           final String productPrice = product['price']?.toString() ?? '0';
           final String productImage =
@@ -1370,6 +1371,7 @@ class _UserOrderDetailsState extends State<UserOrderDetails> {
             price: productPrice,
             size: size,
             name: productName,
+            productNotes: productNotes,
             productId: productId,
             image: productImage,
             quantity: quantity,

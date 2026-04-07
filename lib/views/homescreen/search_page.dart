@@ -50,10 +50,47 @@ class _SearchPageState extends State<SearchPage> {
   // Track the last query we sent to the server to avoid duplicate fetches
   String _lastQuery = '';
 
+  // Pagination state
+  int _productsPage = 1;
+  int _productsLastPage = 1;
+  int _restaurantsPage = 1;
+  int _restaurantsLastPage = 1;
+  bool _isLoadingMore = false;
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _scrollController.addListener(_onScroll);
+    // Load initial data without a query
+    fetchProducts('');
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreProducts();
+    }
+  }
+
+  void _loadMoreProducts() {
+    if (_isLoadingMore) return;
+    if (_productsPage >= _productsLastPage &&
+        _restaurantsPage >= _restaurantsLastPage) return;
+
+    _isLoadingMore = true;
+    final query = _searchController.text.trim();
+    final int nextProductsPage =
+        _productsPage < _productsLastPage ? _productsPage + 1 : _productsPage;
+    final int nextRestaurantsPage = _restaurantsPage < _restaurantsLastPage
+        ? _restaurantsPage + 1
+        : _restaurantsPage;
+    fetchProducts(query,
+        filters: appliedFilters,
+        productsPage: nextProductsPage,
+        restaurantsPage: nextRestaurantsPage,
+        append: true);
   }
 
   void _onSearchChanged() {
@@ -62,17 +99,9 @@ class _SearchPageState extends State<SearchPage> {
     if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 600), () {
       if (query.isEmpty) {
-        // Clear displayed results when the query is empty
-        if (mounted) {
-          setState(() {
-            allProducts = [];
-            allRestaurants = [];
-            noData = false;
-            _lastQuery = '';
-          });
-        } else {
-          _lastQuery = '';
-        }
+        // Reload initial data when the query is cleared
+        _lastQuery = '';
+        fetchProducts('', filters: appliedFilters);
         return;
       }
 
@@ -94,6 +123,7 @@ class _SearchPageState extends State<SearchPage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -124,13 +154,17 @@ class _SearchPageState extends State<SearchPage> {
         workingHoursList = workingHours as List<dynamic>;
       }
 
+      if (workingHoursList.isEmpty) {
+        return isOpen;
+      }
+
       final todaySchedule = workingHoursList.firstWhere(
         (schedule) => schedule['day'] == currentDay,
         orElse: () => null,
       );
 
-      // If no schedule for today, store is closed
-      if (todaySchedule == null) return false;
+      // If no schedule for today, fall back to backend is_open
+      if (todaySchedule == null) return isOpen;
 
       String? openTimeString = todaySchedule['start_time'];
       String? closeTimeString = todaySchedule['end_time'];
@@ -409,6 +443,7 @@ class _SearchPageState extends State<SearchPage> {
           storeDeliveryPrice: allProducts[index]['store']['delivery_price'],
           storeID: allProducts[index]['store']['id'].toString(),
           storeName: allProducts[index]['store']['name'],
+          productNotes: allProducts[index]['product_notes'] != "" ? allProducts[index]['product_notes'] : "-",
           storeImage: allProducts[index]['store']['image'],
           storeLocation: allProducts[index]['store']['address'],
           storeOpenTime: allProducts[index]['store']['open_time'],
@@ -468,13 +503,18 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> fetchProducts(String query,
-      {Map<String, dynamic>? filters}) async {
+      {Map<String, dynamic>? filters,
+      int productsPage = 1,
+      int restaurantsPage = 1,
+      bool append = false}) async {
     // Avoid doing any work if widget is already disposed
     if (!mounted) return;
 
     if (mounted) {
       setState(() {
-        _isLoading = true;
+        if (!append) {
+          _isLoading = true;
+        }
         _hasError = false;
       });
     }
@@ -482,8 +522,14 @@ class _SearchPageState extends State<SearchPage> {
     try {
       // Construct the URL with the query parameter
       final Map<String, String> myParam = {
-        'query': query,
+        'paginate': 'true',
+        'products_page': productsPage.toString(),
+        'restaurants_page': restaurantsPage.toString(),
       };
+
+      if (query.isNotEmpty) {
+        myParam['query'] = query;
+      }
 
       if (filters != null) {
         filters.forEach((key, value) {
@@ -507,35 +553,82 @@ class _SearchPageState extends State<SearchPage> {
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
         print(data);
-        final products = data['products'] is List ? data['products'] : [];
-        final restaurants =
-            data['restaurants'] is List ? data['restaurants'] : [];
+
+        // Handle paginated response format
+        List<dynamic> products = [];
+        List<dynamic> restaurants = [];
+
+        if (data['paginate'] == true) {
+          final productsData = data['products'];
+          final restaurantsData = data['restaurants'];
+          products = productsData['data'] is List ? productsData['data'] : [];
+          restaurants = restaurantsData['data'] is List ? restaurantsData['data'] : [];
+          _productsPage = productsData['current_page'] ?? 1;
+          _productsLastPage = productsData['last_page'] ?? 1;
+          _restaurantsPage = restaurantsData['current_page'] ?? 1;
+          _restaurantsLastPage = restaurantsData['last_page'] ?? 1;
+        } else {
+          products = data['products'] is List ? data['products'] : [];
+          restaurants = data['restaurants'] is List ? data['restaurants'] : [];
+          _productsPage = 1;
+          _productsLastPage = 1;
+          _restaurantsPage = 1;
+          _restaurantsLastPage = 1;
+        }
 
         if (mounted) {
           setState(() {
-            allProducts = products;
-            allRestaurants = restaurants;
-            noData = (allProducts.isEmpty && allRestaurants.isEmpty);
+            if (append) {
+              final int prevLength = allProducts.length;
+              allProducts.addAll(products);
+              allRestaurants.addAll(restaurants);
 
-            // Reset or set other variables accordingly
-            isSelected = List<bool>.filled(allProducts.length, false);
-            selectedComponents = List<List<List<String>>>.generate(
-                allProducts.length, (_) => []);
-            selectedSizes = List<List<List<String>>>.generate(
-              allProducts.length,
-              (_) => [],
-            );
-            componentQuantities =
-                List<List<List<int>>>.generate(allProducts.length, (_) => []);
-            selectedDrinks = List<List<List<String>>>.generate(
-                allProducts.length, (_) => []);
-            drinkQuantities =
-                List<List<List<int>>>.generate(allProducts.length, (_) => []);
-            quantities = List<int>.filled(allProducts.length, 0);
-            applyToAll = List<bool>.filled(allProducts.length, false);
-            showComponents = List<bool>.filled(allProducts.length, true);
-            applyToAllDrinks = List<bool>.filled(allProducts.length, false);
-            finalPrice = List<double>.filled(allProducts.length, 0);
+              // Extend tracking lists for new products
+              isSelected.addAll(List<bool>.filled(products.length, false));
+              selectedComponents.addAll(List<List<List<String>>>.generate(
+                  products.length, (_) => []));
+              selectedSizes.addAll(List<List<List<String>>>.generate(
+                  products.length, (_) => []));
+              componentQuantities.addAll(List<List<List<int>>>.generate(
+                  products.length, (_) => []));
+              selectedDrinks.addAll(List<List<List<String>>>.generate(
+                  products.length, (_) => []));
+              drinkQuantities.addAll(List<List<List<int>>>.generate(
+                  products.length, (_) => []));
+              quantities.addAll(List<int>.filled(products.length, 0));
+              applyToAll.addAll(List<bool>.filled(products.length, false));
+              showComponents.addAll(List<bool>.filled(products.length, true));
+              applyToAllDrinks.addAll(List<bool>.filled(products.length, false));
+              finalPrice.addAll(List<double>.filled(products.length, 0));
+              selectedSizeIndices.addAll(List<List<int>>.generate(
+                  products.length, (_) => []));
+            } else {
+              allProducts = products;
+              allRestaurants = restaurants;
+              noData = (allProducts.isEmpty && allRestaurants.isEmpty);
+
+              // Reset or set other variables accordingly
+              isSelected = List<bool>.filled(allProducts.length, false, growable: true);
+              selectedComponents = List<List<List<String>>>.generate(
+                  allProducts.length, (_) => []);
+              selectedSizes = List<List<List<String>>>.generate(
+                allProducts.length,
+                (_) => [],
+              );
+              componentQuantities =
+                  List<List<List<int>>>.generate(allProducts.length, (_) => []);
+              selectedDrinks = List<List<List<String>>>.generate(
+                  allProducts.length, (_) => []);
+              drinkQuantities =
+                  List<List<List<int>>>.generate(allProducts.length, (_) => []);
+              quantities = List<int>.filled(allProducts.length, 0, growable: true);
+              applyToAll = List<bool>.filled(allProducts.length, false, growable: true);
+              showComponents = List<bool>.filled(allProducts.length, true, growable: true);
+              applyToAllDrinks = List<bool>.filled(allProducts.length, false, growable: true);
+              finalPrice = List<double>.filled(allProducts.length, 0, growable: true);
+              selectedSizeIndices = List<List<int>>.generate(
+                  allProducts.length, (_) => []);
+            }
           });
         }
       } else {
@@ -557,6 +650,7 @@ class _SearchPageState extends State<SearchPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -663,8 +757,21 @@ class _SearchPageState extends State<SearchPage> {
     return Consumer<CartProvider>(
       builder: (context, cartProvider, child) {
         List<CartItem> cartItems = cartProvider.cartItems;
+        final bool storeOpen = isStoreOpenByWorkingHours(
+            product['store'], product['store']['is_open'] == true);
         return InkWell(
           onTap: () {
+            if (!storeOpen) {
+              Fluttertoast.showToast(
+                  msg: "لا يمكنك الطلب الان ،المحل مغلق",
+                  toastLength: Toast.LENGTH_LONG,
+                  gravity: ToastGravity.BOTTOM,
+                  timeInSecForIosWeb: 3,
+                  backgroundColor: const Color(0xffE74C3C),
+                  textColor: Colors.white,
+                  fontSize: 16.0);
+              return;
+            }
             setState(() {
               if (!isSelected[index]) {
                 isSelected[index] = !isSelected[index];
@@ -1752,20 +1859,14 @@ class _SearchPageState extends State<SearchPage> {
                 ),
               ),
               child: SingleChildScrollView(
+                controller: _scrollController,
                 child: Column(
                   children: [
                     SearchInput(
                       controller: _searchController,
                       onFilterTap: showFilterBottomSheet,
                       onChanged: (query) {
-                        // When the field is cleared, remove results immediately.
-                        if (query.isEmpty) {
-                          setState(() {
-                            allProducts = [];
-                            allRestaurants = [];
-                            noData = false;
-                          });
-                        }
+                        // _onSearchChanged handles debounce and refetch
                       },
                     ),
                     _isLoading
@@ -1773,6 +1874,11 @@ class _SearchPageState extends State<SearchPage> {
                         : _hasError
                             ? Center(child: Text("Error fetching data"))
                             : buildProductAndRestaurantGrid(),
+                    if (_isLoadingMore)
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
                   ],
                 ),
               ),
