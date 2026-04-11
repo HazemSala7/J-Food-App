@@ -59,61 +59,102 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
   String myToken = "";
   bool isSubmitting = false;
   Future<Map<String, dynamic>> registerFunction() async {
-    var headers = {'Accept': 'application/json'};
-    final response = await http.post(
-      Uri.parse(AppLink.signUp),
-      headers: headers,
-      body: {
-        'email': "${nameController.text}${phoneController.text}@gmail.com",
-        'password': "123",
-        'phone': phoneController.text,
-        'name': nameController.text,
-        'serial_number': "0",
-        'id_number': "0",
-        'role_id': "2",
-        'restaurant_id': "0",
-      },
-    );
-
-    print('Register response body: ${response.body}');
-
     try {
-      var data = jsonDecode(response.body.toString());
-      return data;
-    } catch (e) {
-      print('Error decoding JSON: $e');
-      throw Exception('Failed to parse register response');
+      var headers = {'Accept': 'application/json'};
+      final response = await http.post(
+        Uri.parse(AppLink.signUp),
+        headers: headers,
+        body: {
+          'email': "${nameController.text}${phoneController.text}@gmail.com",
+          'password': "123",
+          'phone': phoneController.text,
+          'name': nameController.text,
+          'serial_number': "0",
+          'id_number': "0",
+          'role_id': "2",
+          'restaurant_id': "0",
+        },
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        Fluttertoast.showToast(
+          msg: 'فشل التسجيل - كود الخطأ: ${response.statusCode}',
+          timeInSecForIosWeb: 5,
+        );
+        throw Exception('Register failed: ${response.statusCode} - ${response.body}');
+      }
+
+      try {
+        var data = jsonDecode(response.body.toString());
+        return data;
+      } catch (e) {
+        Fluttertoast.showToast(
+          msg: 'فشل قراءة رد السيرفر أثناء التسجيل',
+          timeInSecForIosWeb: 5,
+        );
+        throw Exception('Failed to parse register response: $e');
+      }
+    } on SocketException {
+      Fluttertoast.showToast(
+        msg: 'لا يوجد اتصال بالإنترنت - فشل التسجيل',
+        timeInSecForIosWeb: 5,
+      );
+      rethrow;
+    } on http.ClientException catch (e) {
+      Fluttertoast.showToast(
+        msg: 'خطأ بالاتصال أثناء التسجيل: ${e.message}',
+        timeInSecForIosWeb: 5,
+      );
+      rethrow;
     }
   }
 
   Future<Map<String, dynamic>> checkPhoneNumber(String phoneNumber) async {
-    final response = await http.get(
-      Uri.parse('${AppLink.checkPhoneNumber}/$phoneNumber'),
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('${AppLink.checkPhoneNumber}/$phoneNumber'),
+      );
 
-    if (response.headers['content-type']?.contains('application/json') ??
-        false) {
-      try {
-        final Map<String, dynamic> responseData = json.decode(response.body);
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          return responseData;
-        } else {
-          Navigator.of(context).pop();
+      if (response.headers['content-type']?.contains('application/json') ??
+          false) {
+        try {
+          final Map<String, dynamic> responseData = json.decode(response.body);
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            return responseData;
+          } else {
+            Fluttertoast.showToast(
+              msg: 'فشل التحقق من رقم الهاتف - كود: ${response.statusCode}\n${responseData['message'] ?? ''}',
+              timeInSecForIosWeb: 5,
+            );
+            throw Exception('Failed to check phone: ${response.statusCode}');
+          }
+        } catch (e) {
+          if (e is Exception && e.toString().contains('Failed to check phone')) rethrow;
           Fluttertoast.showToast(
-            msg: 'Error checking phone number or during registration',
-            timeInSecForIosWeb: 4,
+            msg: 'فشل قراءة رد السيرفر أثناء التحقق من الهاتف',
+            timeInSecForIosWeb: 5,
           );
-          print(
-              'Error checking phone number or during registration: ${responseData['message']}');
-          throw Exception('Failed to check phone number');
+          throw Exception('Failed to parse phone check response: $e');
         }
-      } catch (e) {
-        print('Error decoding JSON: $e');
-        throw Exception('Failed to parse phone check response');
+      } else {
+        Fluttertoast.showToast(
+          msg: 'رد غير متوقع من السيرفر (content-type: ${response.headers['content-type']})\nStatus: ${response.statusCode}',
+          timeInSecForIosWeb: 6,
+        );
+        throw Exception('Unexpected content type: ${response.headers['content-type']}');
       }
-    } else {
-      throw Exception(
-          'Unexpected content type: ${response.headers['content-type']}');
+    } on SocketException {
+      Fluttertoast.showToast(
+        msg: 'لا يوجد اتصال بالإنترنت - فشل التحقق من الهاتف',
+        timeInSecForIosWeb: 5,
+      );
+      rethrow;
+    } on http.ClientException catch (e) {
+      Fluttertoast.showToast(
+        msg: 'خطأ بالاتصال أثناء التحقق من الهاتف: ${e.message}',
+        timeInSecForIosWeb: 5,
+      );
+      rethrow;
     }
   }
 
@@ -144,11 +185,16 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
           }
         }
       } else {
-        print(
-            "Login failed. Status: ${response.statusCode}, Body: ${response.body}");
+        Fluttertoast.showToast(
+          msg: 'فشل تسجيل الدخول - كود: ${response.statusCode}',
+          timeInSecForIosWeb: 5,
+        );
       }
     } catch (e) {
-      print("Login error: $e");
+      Fluttertoast.showToast(
+        msg: 'خطأ أثناء تسجيل الدخول: ${e.runtimeType}',
+        timeInSecForIosWeb: 5,
+      );
     }
   }
 
@@ -289,14 +335,20 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
   }
 
   Future<void> addOrder() async {
-    var phoneCheckResponse = await checkPhoneNumber(phoneController.text);
+    late Map<String, dynamic> phoneCheckResponse;
+    try {
+      phoneCheckResponse = await checkPhoneNumber(phoneController.text);
+    } catch (e) {
+      // Toast already shown inside checkPhoneNumber
+      _dismissLoadingDialog();
+      rethrow;
+    }
 
     if (phoneCheckResponse['status'] == 'true') {
       var user = phoneCheckResponse['user'];
 
       if (user['status'] == 'blocked') {
-        Navigator.of(context).pop();
-        print('User is blocked: ${user['id']}');
+        _dismissLoadingDialog();
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -383,7 +435,14 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
       await addOrderAfterRegistration(userID);
     } else {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      var registerResponse = await registerFunction();
+      late Map<String, dynamic> registerResponse;
+      try {
+        registerResponse = await registerFunction();
+      } catch (e) {
+        // Toast already shown inside registerFunction
+        _dismissLoadingDialog();
+        rethrow;
+      }
 
       if (registerResponse['status'] == 'true') {
         var user = registerResponse['user'];
@@ -398,14 +457,19 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
         await prefs.setString('phone_number', user['phone']);
         await addOrderAfterRegistration(user['id'].toString());
       } else {
-        Navigator.of(context).pop();
+        _dismissLoadingDialog();
         Fluttertoast.showToast(
-            msg: 'حدث مشكلة اثناء تسجيل البيانات يرجى المحاولة مرة اخرى',
-            timeInSecForIosWeb: 4);
-        print('Registration failed: ${registerResponse['message']}');
+            msg: 'فشل التسجيل: ${registerResponse['message'] ?? 'خطأ غير معروف'}',
+            timeInSecForIosWeb: 5);
         throw Exception('Registration failed: ${registerResponse['message']}');
       }
     }
+  }
+
+  void _dismissLoadingDialog() {
+    try {
+      Navigator.of(context, rootNavigator: true).pop();
+    } catch (_) {}
   }
 
   Future<void> addOrderAfterRegistration(String user_id) async {
@@ -601,15 +665,38 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
         };
         final headers = {'Content-Type': 'application/json'};
 
-        print(jsonEncode(data));
-        final response = await http.post(
-          Uri.parse(AppLink.addOrderAutomat),
-          headers: headers,
-          body: jsonEncode(data),
-        );
+        late http.Response response;
+        try {
+          response = await http.post(
+            Uri.parse(AppLink.addOrderAutomat),
+            headers: headers,
+            body: jsonEncode(data),
+          );
+        } on SocketException {
+          _dismissLoadingDialog();
+          Fluttertoast.showToast(
+            msg: 'لا يوجد اتصال بالإنترنت - فشل إرسال الطلب',
+            timeInSecForIosWeb: 5,
+          );
+          throw Exception('Network error sending order');
+        } on http.ClientException catch (e) {
+          _dismissLoadingDialog();
+          Fluttertoast.showToast(
+            msg: 'خطأ بالاتصال أثناء إرسال الطلب: ${e.message}',
+            timeInSecForIosWeb: 5,
+          );
+          throw Exception('Client error sending order: ${e.message}');
+        } catch (e) {
+          _dismissLoadingDialog();
+          Fluttertoast.showToast(
+            msg: 'خطأ غير متوقع أثناء إرسال الطلب: ${e.runtimeType}',
+            timeInSecForIosWeb: 5,
+          );
+          rethrow;
+        }
 
         if (response.statusCode == 200 || response.statusCode == 201) {
-          Navigator.of(context, rootNavigator: true).pop();
+          _dismissLoadingDialog();
           Fluttertoast.showToast(msg: "تم اضافه الطلبيه بنجاح");
 
           cartProvider.clearCart();
@@ -722,19 +809,46 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
           await prefs.setString('name', nameController.text);
           await prefs.setString('phone_number', phoneController.text);
         } else {
-          Navigator.of(context, rootNavigator: true).pop();
-          Fluttertoast.showToast(msg: "حدث خطأ أثناء إضافة الطلبية");
-          throw Exception('Failed to add order: ${response.statusCode}');
+          _dismissLoadingDialog();
+          String serverMsg = '';
+          try {
+            final decoded = jsonDecode(response.body);
+            serverMsg = decoded['message'] ?? decoded['error'] ?? '';
+          } catch (_) {
+            serverMsg = response.body.length > 100 ? response.body.substring(0, 100) : response.body;
+          }
+          Fluttertoast.showToast(
+            msg: 'فشل إضافة الطلبية - كود: ${response.statusCode}\n$serverMsg',
+            timeInSecForIosWeb: 6,
+          );
+          throw Exception('Failed to add order: ${response.statusCode} - $serverMsg');
         }
       } else {
-        Navigator.of(context, rootNavigator: true).pop();
+        _dismissLoadingDialog();
         Fluttertoast.showToast(
             msg: "عذرا وصلت عدد الطلبات اليوم لهذا المطعم العدد الاقصى",
             timeInSecForIosWeb: 5);
         throw Exception('Restaurant cannot checkout');
       }
+    } on SocketException {
+      _dismissLoadingDialog();
+      Fluttertoast.showToast(
+        msg: 'لا يوجد اتصال بالإنترنت',
+        timeInSecForIosWeb: 5,
+      );
+      rethrow;
     } catch (e) {
-      print('Error in addOrderAfterRegistration: $e');
+      // Only show toast if not already shown by inner catches
+      if (!e.toString().contains('Failed to add order') &&
+          !e.toString().contains('Restaurant cannot checkout') &&
+          !e.toString().contains('Network error') &&
+          !e.toString().contains('Client error')) {
+        _dismissLoadingDialog();
+        Fluttertoast.showToast(
+          msg: 'خطأ في إتمام الطلب: ${e.runtimeType}\n${e.toString().length > 80 ? e.toString().substring(0, 80) : e}',
+          timeInSecForIosWeb: 6,
+        );
+      }
       rethrow;
     }
   }
@@ -1515,11 +1629,9 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
                                   try {
                                     await addOrder();
                                   } catch (e) {
-                                    print('Error submitting order: $e');
-                                    Fluttertoast.showToast(
-                                      msg: '$e',
-                                      timeInSecForIosWeb: 4,
-                                    );
+                                    // Toasts already shown inside addOrder/sub-functions
+                                    // Dismiss loading dialog if still showing
+                                    _dismissLoadingDialog();
                                   } finally {
                                     setState(() {
                                       isSubmitting = false;
