@@ -48,8 +48,8 @@ class _MainScreenState extends State<MainScreen>
   late Stream<ConnectivityResult> connectivityStream;
   final Connectivity _connectivity = Connectivity();
   late StreamController<ConnectivityResult> _connectivityController;
-  late Future<Map<String, dynamic>?> _currentOrderFuture;
-  Map<String, dynamic>? _currentOrderFromHome;
+  late Future<List<Map<String, dynamic>>> _currentOrdersFuture;
+  List<Map<String, dynamic>> _currentOrdersFromHome = [];
 
   @override
   void initState() {
@@ -69,7 +69,7 @@ class _MainScreenState extends State<MainScreen>
     _checkConnectivity();
 
     connectivityStream = _connectivityController.stream;
-    _currentOrderFuture = _fetchCurrentOrder();
+    _currentOrdersFuture = _fetchCurrentOrders();
   }
 
   Future<void> _checkConnectivity() async {
@@ -121,33 +121,39 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchCurrentOrder() async {
+  Future<List<Map<String, dynamic>>> _fetchCurrentOrders() async {
     try {
       final data = await getHomeDataList();
 
       if (data == null || data is! Map) {
-        return null;
+        return [];
       }
 
       final dynamic hasOrder = data['has_order'];
-      if (data['current_order'] is Map<String, dynamic> &&
-          (hasOrder == null ||
-              hasOrder == true ||
-              hasOrder == 1 ||
-              hasOrder == "1")) {
-        final currentOrder = Map<String, dynamic>.from(
-          data['current_order'] as Map,
-        );
-        // Only return if it's an active order
-        if (_isActiveOrder(currentOrder)) {
-          return currentOrder;
+      if (hasOrder == true || hasOrder == 1 || hasOrder == "1") {
+        if (data['current_orders'] is List) {
+          final List orders = data['current_orders'] as List;
+          return orders
+              .whereType<Map<String, dynamic>>()
+              .map((o) => Map<String, dynamic>.from(o))
+              .where((o) => _isActiveOrder(o))
+              .toList();
+        }
+        // Fallback: support old single current_order key
+        if (data['current_order'] is Map<String, dynamic>) {
+          final currentOrder = Map<String, dynamic>.from(
+            data['current_order'] as Map,
+          );
+          if (_isActiveOrder(currentOrder)) {
+            return [currentOrder];
+          }
         }
       }
 
-      return null;
+      return [];
     } catch (e) {
-      print('Error fetching current order: $e');
-      return null;
+      print('Error fetching current orders: $e');
+      return [];
     }
   }
 
@@ -191,21 +197,29 @@ class _MainScreenState extends State<MainScreen>
   }
 
   Widget _buildCurrentOrderSection() {
-    if (_currentOrderFromHome != null) {
-      return _buildCurrentOrderCard(_currentOrderFromHome!);
+    if (_currentOrdersFromHome.isNotEmpty) {
+      return Column(
+        children: _currentOrdersFromHome
+            .map((order) => _buildCurrentOrderCard(order))
+            .toList(),
+      );
     }
 
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: _currentOrderFuture,
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _currentOrdersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();
         }
 
-        final order = snapshot.data;
-        if (order == null) return const SizedBox.shrink();
+        final orders = snapshot.data;
+        if (orders == null || orders.isEmpty) return const SizedBox.shrink();
 
-        return _buildCurrentOrderCard(order);
+        return Column(
+          children: orders
+              .map((order) => _buildCurrentOrderCard(order))
+              .toList(),
+        );
       },
     );
   }
@@ -629,22 +643,29 @@ class _MainScreenState extends State<MainScreen>
     }
 
     final dynamic hasOrder = data['has_order'];
-    if (data['current_order'] is Map<String, dynamic> &&
-        (hasOrder == null ||
-            hasOrder == true ||
-            hasOrder == 1 ||
-            hasOrder == "1")) {
-      final currentOrder = Map<String, dynamic>.from(
-        data['current_order'] as Map,
-      );
-      // Only show the order if it's not delivered
-      if (_isActiveOrder(currentOrder)) {
-        _currentOrderFromHome = currentOrder;
+    if (hasOrder == true || hasOrder == 1 || hasOrder == "1") {
+      if (data['current_orders'] is List) {
+        final List orders = data['current_orders'] as List;
+        _currentOrdersFromHome = orders
+            .whereType<Map<String, dynamic>>()
+            .map((o) => Map<String, dynamic>.from(o))
+            .where((o) => _isActiveOrder(o))
+            .toList();
+      } else if (data['current_order'] is Map<String, dynamic>) {
+        // Fallback: support old single current_order key
+        final currentOrder = Map<String, dynamic>.from(
+          data['current_order'] as Map,
+        );
+        if (_isActiveOrder(currentOrder)) {
+          _currentOrdersFromHome = [currentOrder];
+        } else {
+          _currentOrdersFromHome = [];
+        }
       } else {
-        _currentOrderFromHome = null;
+        _currentOrdersFromHome = [];
       }
     } else {
-      _currentOrderFromHome = null;
+      _currentOrdersFromHome = [];
     }
 
     return _buildHomeContent(context, data, sliders, ramadanTime);
@@ -667,8 +688,8 @@ class _MainScreenState extends State<MainScreen>
           strokeWidth: 3.0,
           onRefresh: () async {
             setState(() {
-              _currentOrderFromHome = null;
-              _currentOrderFuture = _fetchCurrentOrder();
+              _currentOrdersFromHome = [];
+              _currentOrdersFuture = _fetchCurrentOrders();
             });
             await Future.delayed(const Duration(milliseconds: 500));
           },
