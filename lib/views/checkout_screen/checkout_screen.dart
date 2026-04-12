@@ -58,6 +58,7 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
   String ramadanDeliveryTime = "";
   String myToken = "";
   bool isSubmitting = false;
+  bool _isLoadingDialogShowing = false;
   Future<Map<String, dynamic>> registerFunction() async {
     try {
       var headers = {'Accept': 'application/json'};
@@ -467,6 +468,8 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
   }
 
   void _dismissLoadingDialog() {
+    if (!_isLoadingDialogShowing) return;
+    _isLoadingDialogShowing = false;
     try {
       Navigator.of(context, rootNavigator: true).pop();
     } catch (_) {}
@@ -1605,8 +1608,10 @@ class _BuyNowState extends State<BuyNow> with TickerProviderStateMixin {
                                   setState(() {
                                     isSubmitting = true;
                                   });
+                                  _isLoadingDialogShowing = true;
                                   showDialog(
                                     context: context,
+                                    barrierDismissible: false,
                                     builder: (BuildContext context) {
                                       return StatefulBuilder(
                                         builder: (BuildContext context,
