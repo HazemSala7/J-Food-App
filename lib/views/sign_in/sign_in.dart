@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:j_food_updated/resources/api-const.dart';
 import 'package:j_food_updated/views/homescreen/homescreen.dart';
+import 'package:j_food_updated/views/resturant_page/restaurant_page.dart';
 import 'package:flutter/material.dart';
 import 'package:j_food_updated/constants/constants.dart';
 import 'package:http/http.dart' as http;
@@ -54,26 +55,50 @@ class _signInState extends State<signIn> {
             (route) => false);
       } else {
         final restaurantId = responseData['restaurent']['id'];
+        final userId = responseData['user']['id'];
         final categoryId = responseData['restaurent']['category_id'];
         final status = responseData['restaurent']['active'];
         final restaurantName = responseData['restaurent']['name'];
+        final restaurantImage = responseData['restaurent']['image'] ?? '';
+        final restaurantAddress = responseData['restaurent']['address'] ?? '';
+        final deliveryPrice = responseData['restaurent']['delivery_price'] ?? '';
+        final storeCloseTime = responseData['restaurent']['close_time'] ?? '';
+        final storeOpenTime = responseData['restaurent']['open_time'] ?? '';
         final List subCategories = responseData['sub_categories'] ?? [];
         final String subCategoriesJson = jsonEncode(subCategories);
         await prefs.setString('sub_categories', subCategoriesJson);
         await prefs.setBool('sign_in', true);
         await prefs.setString('restaurant_id', restaurantId.toString());
+        await prefs.setString('restaurant_user_id', userId.toString());
         await prefs.setString('restaurant_name', restaurantName);
+        await prefs.setString('restaurant_image', restaurantImage);
+        await prefs.setString('restaurant_address', restaurantAddress);
+        await prefs.setString('delivery_price', deliveryPrice);
+        await prefs.setString('storeOpenTime', storeOpenTime);
+        await prefs.setString('storeCloseTime', storeCloseTime);
         await prefs.setString('category_id', categoryId.toString());
         await prefs.setString('password', passwordController.text);
         await prefs.setString('phone', phoneController.text);
+        await prefs.setString('restaurant_phone', phoneController.text);
+        await prefs.setString('restaurant_password', passwordController.text);
         await prefs.setString('status', status);
-        // Navigator.of(context).push(MaterialPageRoute(
-        //   builder: (context) => RestaurantPage(
-        //       storeId: restaurantId.toString(),
-        //       categoryId: categoryId.toString(),
-        //       status: status,
-        //       restaurantName: restaurantName),
-        // ));
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => RestaurantPage(
+              storeId: restaurantId.toString(),
+              userId: userId.toString(),
+              categoryId: categoryId.toString(),
+              status: status,
+              restaurantName: restaurantName,
+              restaurantImage: restaurantImage,
+              restaurantAddress: restaurantAddress,
+              deliveryPrice: deliveryPrice,
+              storeCloseTime: storeCloseTime,
+              storeOpenTime: storeOpenTime,
+            ),
+          ),
+          (route) => false,
+        );
       }
     } else {
       showDialog(

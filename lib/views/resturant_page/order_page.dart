@@ -296,7 +296,7 @@ class _OrderPageState extends State<OrderPage>
           channelDescription: 'تنبيه صوتي عند وصول طلب جديد',
           importance: Importance.max,
           priority: Priority.high,
-          sound: RawResourceAndroidNotificationSound('sound'),
+          sound: RawResourceAndroidNotificationSound('order_alarm'),
           playSound: true,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
