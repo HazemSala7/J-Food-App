@@ -29,17 +29,25 @@ import 'views/homescreen/homescreen.dart';
 import 'services/timer_calss.dart';
 import 'notifications/notification_service.dart';
 
-Future<void> _firebaseOrderMessagingBackgroundHandler(
-    RemoteMessage message) async {
-  await showOrderStatusNotification(
-    message.notification?.title ?? 'New Notification',
-    message.notification?.body ?? 'You have a new notification',
-    message.data['orderId'],
-  );
-}
-
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   print("Background message received: ${message.notification?.title}");
+
+  final prefs = await SharedPreferences.getInstance();
+  final bool isRestaurant = prefs.getBool('sign_in') ?? false;
+
+  if (isRestaurant && message.notification != null) {
+    // Loud notification for restaurant
+    await showRestaurantPushNotification(
+      message.notification?.title ?? 'طلب جديد!',
+      message.notification?.body ?? 'لديك إشعار جديد',
+    );
+  } else if (message.data.containsKey('orderId')) {
+    await showOrderStatusNotification(
+      message.notification?.title ?? 'New Notification',
+      message.notification?.body ?? 'You have a new notification',
+      message.data['orderId'],
+    );
+  }
 }
 
 Future<void> clearCache() async {
@@ -62,8 +70,36 @@ Future<void> clearAllDataOnNewVersion() async {
     final savedVersion = prefs.getString('app_version');
 
     if (savedVersion != null && savedVersion != currentVersion) {
+      // Preserve restaurant login data across version updates
+      final keysToPreserve = [
+        'sign_in', 'restaurant_id', 'restaurant_user_id', 'restaurant_name',
+        'restaurant_image', 'restaurant_address', 'delivery_price',
+        'storeOpenTime', 'storeCloseTime', 'category_id', 'password', 'phone',
+        'restaurant_phone', 'restaurant_password', 'status', 'sub_categories',
+        'user_id', 'fcm_token',
+      ];
+
+      // Save login data before clearing
+      final Map<String, dynamic> preserved = {};
+      final bool? wasSignedIn = prefs.getBool('sign_in');
+      if (wasSignedIn != null) preserved['sign_in'] = wasSignedIn;
+      for (final key in keysToPreserve) {
+        if (key == 'sign_in') continue;
+        final value = prefs.getString(key);
+        if (value != null) preserved[key] = value;
+      }
+
       // New version detected — clear everything
       await prefs.clear();
+
+      // Restore login data
+      for (final entry in preserved.entries) {
+        if (entry.value is bool) {
+          await prefs.setBool(entry.key, entry.value);
+        } else {
+          await prefs.setString(entry.key, entry.value);
+        }
+      }
 
       // Delete SQLite database
       final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -75,7 +111,7 @@ Future<void> clearAllDataOnNewVersion() async {
       // Clear cache
       await clearCache();
 
-      print('All local data cleared for new version: $currentVersion');
+      print('All local data cleared for new version: $currentVersion (login preserved)');
     }
 
     // Save current version
@@ -114,9 +150,7 @@ void main() async {
 
     await FirebaseAppCheck.instance.activate();
 
-    FirebaseMessaging.onBackgroundMessage(
-        _firebaseOrderMessagingBackgroundHandler);
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
 
     setupFirebaseMessaging();
   } catch (e) {

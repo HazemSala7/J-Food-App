@@ -11,7 +11,7 @@ import '../Models/FavoriteItem.dart';
 
 class CartDatabaseHelper {
   static final CartDatabaseHelper _instance = CartDatabaseHelper._internal();
-  static final int dbVersion = 37; // Fix product_notes column name
+  static final int dbVersion = 38; // Fix product_notes column name
 
   factory CartDatabaseHelper() => _instance;
 

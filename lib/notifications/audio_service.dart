@@ -1,32 +1,48 @@
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/services.dart';
 
 class AudioService {
   final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
 
   Future<void> playSound() async {
-    // Load the audio asset and play it
+    if (_isPlaying) return;
+    _isPlaying = true;
     try {
-      await _audioPlayer.setAsset('assets/order_sound.wav');
-      await _audioPlayer.setLoopMode(LoopMode.one); // Loop the sound
+      // Use the loud alarm sound
+      await _audioPlayer.setAsset('assets/order_alarm.wav');
+      await _audioPlayer.setVolume(1.0); // MAX volume
+      await _audioPlayer.setLoopMode(LoopMode.one); // Loop until stopped
       await _audioPlayer.play();
+
+      // Vibrate with the sound
+      _startVibration();
     } catch (e) {
-      print('Error playing sound: $e'); // Handle any errors
+      _isPlaying = false;
+      print('Error playing sound: $e');
+    }
+  }
+
+  void _startVibration() async {
+    // Continuous vibration pattern while sound is playing
+    while (_isPlaying) {
+      HapticFeedback.vibrate();
+      await Future.delayed(Duration(milliseconds: 500));
     }
   }
 
   Future<void> stopSound() async {
-    // Stop the audio playback
+    _isPlaying = false;
     try {
       await _audioPlayer.stop();
-      await _audioPlayer
-          .seek(Duration.zero); // Reset playback position if needed
+      await _audioPlayer.seek(Duration.zero);
     } catch (e) {
-      print('Error stopping sound: $e'); // Handle any errors
+      print('Error stopping sound: $e');
     }
   }
 
   void dispose() {
-    // Dispose of the audio player when no longer needed
+    _isPlaying = false;
     _audioPlayer.dispose();
   }
 }

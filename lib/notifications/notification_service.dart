@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -64,6 +66,7 @@ void setupLocalNotification() {
             description: 'تنبيه صوتي عند وصول طلب جديد',
             importance: Importance.max,
             playSound: true,
+            sound: RawResourceAndroidNotificationSound('order_alarm'),
             enableVibration: true,
           ),
         );
@@ -126,10 +129,76 @@ Future<void> showNotification(RemoteMessage message) async {
   }
 }
 
+/// Loud, attention-grabbing notification for restaurant owners
+Future<void> showRestaurantPushNotification(
+  String title,
+  String body,
+) async {
+  BigTextStyleInformation bigTextStyleInformation = BigTextStyleInformation(
+    body,
+    htmlFormatBigText: true,
+    contentTitle: title,
+    htmlFormatContentTitle: true,
+  );
+
+  AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'new_order_alert_channel',
+    'تنبيهات الطلبات الجديدة',
+    channelDescription: 'تنبيه صوتي عند وصول طلب جديد',
+    importance: Importance.max,
+    priority: Priority.max,
+    playSound: true,
+    sound: const RawResourceAndroidNotificationSound('order_alarm'),
+    enableVibration: true,
+    vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500, 200, 500]),
+    enableLights: true,
+    ledColor: const Color.fromARGB(255, 255, 0, 0),
+    ledOnMs: 300,
+    ledOffMs: 300,
+    fullScreenIntent: true,
+    ongoing: true,
+    styleInformation: bigTextStyleInformation,
+    ticker: 'طلب جديد!',
+    category: AndroidNotificationCategory.alarm,
+    visibility: NotificationVisibility.public,
+    autoCancel: false,
+  );
+
+  const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+    sound: 'order_alarm.wav',
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+    interruptionLevel: InterruptionLevel.critical,
+  );
+
+  NotificationDetails platformDetails = NotificationDetails(
+    android: androidDetails,
+    iOS: iosDetails,
+  );
+
+  await flutterLocalNotificationsPlugin.show(
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    title,
+    body,
+    platformDetails,
+  );
+}
+
 void setupFirebaseMessaging() {
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     if (message.notification != null) {
-      showNotification(message);
+      final prefs = await SharedPreferences.getInstance();
+      final bool isRestaurant = prefs.getBool('sign_in') ?? false;
+
+      if (isRestaurant) {
+        await showRestaurantPushNotification(
+          message.notification?.title ?? 'طلب جديد!',
+          message.notification?.body ?? 'لديك إشعار جديد',
+        );
+      } else {
+        showNotification(message);
+      }
     }
   });
 }
