@@ -94,13 +94,13 @@ class CategoryWidget extends StatelessWidget {
           mainAxisCellCount: category['mainAxis'],
           child: InkWell(
             onTap: () {
-              print(categoryImage);
+              final categoryId = data['id']?.toString() ?? '';
               NavigatorFunction(
                 context,
                 AllResturants(
-                  storesArray: data['restaurants'],
+                  categoryId: categoryId,
                   title: data['name'],
-                  image: categoryImage,
+                  image: _getStaticImage(category['name']),
                   noDelivery: noDelivery,
                   changeTab: changeTab,
                 ),

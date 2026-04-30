@@ -1,7 +1,10 @@
+import 'dart:convert';
+import 'package:j_food_updated/resources/api-const.dart';
 import 'package:j_food_updated/views/storescreen/store_provider/store_provider.dart';
 import 'package:j_food_updated/component/header/header.dart';
 import 'package:fancy_shimmer_image/fancy_shimmer_image.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:j_food_updated/constants/constants.dart';
 import 'package:provider/provider.dart';
 import '../../server/functions/functions.dart';
@@ -10,22 +13,56 @@ import '../storescreen/store_screen.dart';
 class AllResturants extends StatefulWidget {
   AllResturants(
       {super.key,
-      required this.storesArray,
+      this.storesArray = const [],
       required this.image,
       required this.title,
       required this.noDelivery,
-      required this.changeTab});
+      required this.changeTab,
+      this.categoryId});
   final bool noDelivery;
   final List storesArray;
   final String title;
   final String image;
   final Function(int) changeTab;
+  final String? categoryId;
   @override
   State<AllResturants> createState() => _AllResturantsState();
 }
 
 class _AllResturantsState extends State<AllResturants> {
   String selectedTab = "مفتوح";
+  bool _isLoading = false;
+  List _stores = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.categoryId != null && widget.categoryId!.isNotEmpty) {
+      _fetchRestaurants();
+    } else {
+      _stores = List.from(widget.storesArray);
+    }
+  }
+
+  Future<void> _fetchRestaurants() async {
+    setState(() => _isLoading = true);
+    try {
+      final uri = Uri.parse(
+          '${AppLink.categoryRestaurants}/${widget.categoryId}/restaurants');
+      final response = await http.get(uri);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final resData = json.decode(response.body);
+        setState(() {
+          _stores = (resData['restaurants'] as List?) ?? [];
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +164,7 @@ class _AllResturantsState extends State<AllResturants> {
 
     // Filter stores based on frontend schedule logic
     final DateTime now = DateTime.now();
-    List filteredStores = widget.storesArray.where((store) {
+    List filteredStores = _stores.where((store) {
       final bool openByFrontend = isOpenByWorkingHours(store, now);
 
       if (selectedTab == "مفتوح") {
@@ -143,7 +180,9 @@ class _AllResturantsState extends State<AllResturants> {
       child: SafeArea(
         child: Scaffold(
           backgroundColor: Colors.white,
-          body: CustomScrollView(
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : CustomScrollView(
             slivers: [
               SliverPersistentHeader(
                 pinned: true,
