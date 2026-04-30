@@ -6,6 +6,12 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: co.j-food.perfect
+
+    integrations:
+      app_store_connect: App Store haze key
 
     scripts:
       - name: Flutter clean
@@ -14,8 +20,11 @@ workflows:
       - name: Get packages
         script: flutter pub get
 
+      - name: Set up code signing
+        script: xcode-project use-profiles
+
       - name: Build IPA
-        script: flutter build ipa --release
+        script: flutter build ipa --release --export-options-plist=$CM_EXPORT_OPTIONS_PLIST
 
     artifacts:
       - build/ios/ipa/*.ipa
