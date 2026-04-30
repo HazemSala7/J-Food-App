@@ -11,7 +11,7 @@ workflows:
         bundle_identifier: co.j-food.perfect
 
     integrations:
-      app_store_connect: App Store haze key
+      app_store_connect: "App Store haze key"
 
     scripts:
       - name: Flutter clean
