@@ -483,12 +483,64 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
+  // ---- Cache keys ----
+  static const String _kCacheSliders = 'home_cache_sliders';
+  static const String _kCacheCategories = 'home_cache_categories';
+  static const String _kCacheStatic = 'home_cache_static';
+  static const String _kCacheTimestamp = 'home_cache_timestamp';
+  static const int _kCacheTtlMs = 24 * 60 * 60 * 1000; // 24 hours
+
+  bool _isCacheFresh(int timestamp) =>
+      (DateTime.now().millisecondsSinceEpoch - timestamp) < _kCacheTtlMs;
+
+  Future<void> _saveStaticCache(
+      SharedPreferences prefs, Map<String, dynamic> res) async {
+    final sliders = res['sliders'];
+    final categories = res['categories'];
+    final staticData = {
+      'close_app': res['close_app'],
+      'app_type': res['app_type'],
+      'error': res['error'],
+      'error_description': res['error_description'],
+      'error_image': res['error_image'],
+    };
+    if (sliders != null)
+      await prefs.setString(_kCacheSliders, json.encode(sliders));
+    if (categories != null)
+      await prefs.setString(_kCacheCategories, json.encode(categories));
+    await prefs.setString(_kCacheStatic, json.encode(staticData));
+    await prefs.setInt(
+        _kCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
+  }
+
   Future<Map<String, dynamic>> getHomeDataList() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String userId = prefs.getString('user_id') ?? "";
 
-      Uri homeUri = Uri.parse(AppLink.homeData);
+      final String? cachedSlidersJson = prefs.getString(_kCacheSliders);
+      final String? cachedCategoriesJson = prefs.getString(_kCacheCategories);
+      final String? cachedStaticJson = prefs.getString(_kCacheStatic);
+      final int cachedTimestamp = prefs.getInt(_kCacheTimestamp) ?? 0;
+
+      final bool cacheIsFresh = cachedSlidersJson != null &&
+          cachedCategoriesJson != null &&
+          cachedStaticJson != null &&
+          _isCacheFresh(cachedTimestamp);
+
+      // No user logged in + cache is fresh → skip API call entirely
+      if (cacheIsFresh && userId.isEmpty) {
+        final Map<String, dynamic> result =
+            Map<String, dynamic>.from(json.decode(cachedStaticJson!));
+        result['sliders'] = json.decode(cachedSlidersJson!);
+        result['categories'] = json.decode(cachedCategoriesJson!);
+        result['special_restaurensts'] =
+            result['special_restaurensts'] ?? [];
+        result['has_order'] = false;
+        return result;
+      }
+
+      Uri homeUri = Uri.parse(AppLink.homeDataSimple);
       if (userId.isNotEmpty) {
         homeUri = homeUri.replace(queryParameters: {'user_id': userId});
       }
@@ -498,8 +550,16 @@ class _MainScreenState extends State<MainScreen>
         var res = json.decode(response.body);
 
         if (res is Map<String, dynamic>) {
-          res['sliders'] =
-              res['sliders'] ??
+          if (cacheIsFresh) {
+            // Use cached sliders/categories, only take current_orders from API
+            res['sliders'] = json.decode(cachedSlidersJson!);
+            res['categories'] = json.decode(cachedCategoriesJson!);
+          } else {
+            // Stale/missing cache → save fresh data
+            await _saveStaticCache(prefs, res);
+          }
+
+          res['sliders'] = res['sliders'] ??
               [
                 {
                   "id": 59,

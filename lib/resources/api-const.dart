@@ -18,6 +18,8 @@ class AppLink {
   static const String sendSms = "${server}verification-code-final";
   static const String updatePhoneStatus = "${server}update-phone-status";
   static const String homeData = "${server}homepagetalabat";
+  static const String homeDataSimple = "${server}home-page-talabat-simple";
+  static const String categoryRestaurants = "${server}talabat/categories";
   static const String storeDetails = "${server}restaurant-data-by-id-v2";
   static const String addOrder = "${server}add_order_talabat";
   static const String addOrderNew = "${server}add_order_talabat_automat";

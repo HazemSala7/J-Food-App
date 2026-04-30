@@ -77,14 +77,18 @@ Future<void> clearAllDataOnNewVersion() async {
         'storeOpenTime', 'storeCloseTime', 'category_id', 'password', 'phone',
         'restaurant_phone', 'restaurant_password', 'status', 'sub_categories',
         'user_id', 'fcm_token',
+        // User verification data — must not be cleared on update
+        'phone_number', 'name', 'barrierToken',
       ];
+      final boolKeysToPreserve = ['sign_in', 'has_entered_phone_number'];
 
       // Save login data before clearing
       final Map<String, dynamic> preserved = {};
-      final bool? wasSignedIn = prefs.getBool('sign_in');
-      if (wasSignedIn != null) preserved['sign_in'] = wasSignedIn;
+      for (final key in boolKeysToPreserve) {
+        final value = prefs.getBool(key);
+        if (value != null) preserved[key] = value;
+      }
       for (final key in keysToPreserve) {
-        if (key == 'sign_in') continue;
         final value = prefs.getString(key);
         if (value != null) preserved[key] = value;
       }
